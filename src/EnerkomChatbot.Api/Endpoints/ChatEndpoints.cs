@@ -88,14 +88,6 @@ public static class ChatEndpoints
         response.Headers.CacheControl = "no-cache";
         response.Headers["X-Accel-Buffering"] = "no";
 
-        if (!prepared.Answered)
-        {
-            await WriteEventAsync(response, "token", new { text = prepared.FallbackAnswer }, cancellationToken);
-            await WriteEventAsync(response, "sources", Array.Empty<SourceDto>(), cancellationToken);
-            await WriteEventAsync(response, "done", new { answered = false }, cancellationToken);
-            return;
-        }
-
         try
         {
             await foreach (var token in chatService.StreamCompletionAsync(prepared.Messages, cancellationToken))

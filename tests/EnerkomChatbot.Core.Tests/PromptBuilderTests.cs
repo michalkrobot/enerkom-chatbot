@@ -139,15 +139,28 @@ public sealed class PromptBuilderTests
     }
 
     [Fact]
-    public void FallbackAnswer_ContainsConfiguredContact()
+    public void BuildContext_NoHits_ReturnsEmptyContextMarker()
+    {
+        // Act
+        var context = PromptBuilder.BuildContext([]);
+
+        // Assert — prázdný retrieval má vlastní značku, aby LLM zvládl pozdrav i slušné „nevím".
+        Assert.Equal(PromptBuilder.EmptyContext, context);
+    }
+
+    [Fact]
+    public void BuildSystemPrompt_NoHits_StillSubstitutesOrgAndUsesEmptyContext()
     {
         // Arrange
-        var builder = CreateBuilder(contact: "pomoc@example.org");
+        var builder = CreateBuilder(name: "Moje Nezisková", contact: "kontakt@example.org");
 
         // Act
-        var fallback = builder.FallbackAnswer();
+        var prompt = builder.BuildSystemPrompt([]);
 
         // Assert
-        Assert.Contains("pomoc@example.org", fallback, StringComparison.Ordinal);
+        Assert.Contains("Moje Nezisková", prompt, StringComparison.Ordinal);
+        Assert.Contains("kontakt@example.org", prompt, StringComparison.Ordinal);
+        Assert.Contains(PromptBuilder.EmptyContext, prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("{CONTEXT}", prompt, StringComparison.Ordinal);
     }
 }

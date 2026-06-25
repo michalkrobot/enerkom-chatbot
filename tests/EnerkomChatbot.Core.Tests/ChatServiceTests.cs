@@ -75,7 +75,7 @@ public sealed class ChatServiceTests
     }
 
     [Fact]
-    public async Task PrepareAsync_NoHits_ReturnsFallbackAndNeverCallsChatClient()
+    public async Task PrepareAsync_NoHits_StillBuildsMessagesWithEmptyContextAndNoSources()
     {
         // Arrange
         var service = CreateService();
@@ -84,19 +84,21 @@ public sealed class ChatServiceTests
             .SearchAsync(Arg.Any<float[]>(), Arg.Any<int>(), Arg.Any<double>(), Arg.Any<CancellationToken>())
             .Returns(Array.Empty<SearchResult>());
 
-        var query = new ChatQuery { Question = "Máte fotovoltaiku?" };
+        const string question = "Ahoj!";
+        var query = new ChatQuery { Question = question };
 
         // Act
         var prepared = await service.PrepareAsync(query);
 
-        // Assert
-        Assert.False(prepared.Answered);
+        // Assert — i bez hitů se sestaví prompt pro LLM (pozdravy musí projít), jen bez citací.
+        Assert.True(prepared.Answered);
         Assert.Empty(prepared.Sources);
-        Assert.Empty(prepared.Messages);
-        Assert.False(string.IsNullOrWhiteSpace(prepared.FallbackAnswer));
+        Assert.Equal(ChatRoles.System, prepared.Messages[0].Role);
+        Assert.Contains(PromptBuilder.EmptyContext, prepared.Messages[0].Content, StringComparison.Ordinal);
 
-        await _chatClient.DidNotReceive().CompleteAsync(Arg.Any<IReadOnlyList<ChatMessage>>(), Arg.Any<CancellationToken>());
-        _ = _chatClient.DidNotReceive().CompleteStreamingAsync(Arg.Any<IReadOnlyList<ChatMessage>>(), Arg.Any<CancellationToken>());
+        var last = prepared.Messages[^1];
+        Assert.Equal(ChatRoles.User, last.Role);
+        Assert.Equal(question, last.Content);
     }
 
     [Fact]
@@ -209,7 +211,7 @@ public sealed class ChatServiceTests
     }
 
     [Fact]
-    public async Task AnswerAsync_NoHits_ReturnsFallbackAndDoesNotCallChatClient()
+    public async Task AnswerAsync_NoHits_StillCallsChatClientWithoutSources()
     {
         // Arrange
         var service = CreateService();
@@ -218,15 +220,20 @@ public sealed class ChatServiceTests
             .SearchAsync(Arg.Any<float[]>(), Arg.Any<int>(), Arg.Any<double>(), Arg.Any<CancellationToken>())
             .Returns(Array.Empty<SearchResult>());
 
-        var query = new ChatQuery { Question = "Něco neznámého?" };
+        const string llmAnswer = "Dobrý den, rád pomůžu. 🙂";
+        _chatClient
+            .CompleteAsync(Arg.Any<IReadOnlyList<ChatMessage>>(), Arg.Any<CancellationToken>())
+            .Returns(llmAnswer);
+
+        var query = new ChatQuery { Question = "Ahoj" };
 
         // Act
         var answer = await service.AnswerAsync(query);
 
-        // Assert
-        Assert.False(answer.Answered);
+        // Assert — pozdrav obslouží LLM, jen bez citací.
+        Assert.True(answer.Answered);
+        Assert.Equal(llmAnswer, answer.Answer);
         Assert.Empty(answer.Sources);
-        Assert.False(string.IsNullOrWhiteSpace(answer.Answer));
-        await _chatClient.DidNotReceive().CompleteAsync(Arg.Any<IReadOnlyList<ChatMessage>>(), Arg.Any<CancellationToken>());
+        await _chatClient.Received(1).CompleteAsync(Arg.Any<IReadOnlyList<ChatMessage>>(), Arg.Any<CancellationToken>());
     }
 }
