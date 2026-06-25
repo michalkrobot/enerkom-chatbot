@@ -32,17 +32,35 @@ public sealed partial class WebCrawler(
 
     public async IAsyncEnumerable<RawSource> LoadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var robots = await LoadRobotsAsync(cancellationToken);
-        var delay = EffectiveDelay(robots);
-
-        var urls = await ResolveUrlsAsync(robots, cancellationToken);
-        if (urls.Count == 0)
+        var sites = ResolveSites();
+        if (sites.Count == 0)
         {
-            logger.LogWarning("Crawler nenašel žádné URL (sitemap ani fallback).");
+            logger.LogWarning("Crawler nemá nakonfigurovaný žádný web (SitemapUrl ani Sites).");
             yield break;
         }
 
-        logger.LogInformation("Crawler zpracuje {Count} URL (delay {Delay} ms).", urls.Count, delay);
+        foreach (var site in sites)
+        {
+            await foreach (var source in LoadSiteAsync(site, cancellationToken))
+            {
+                yield return source;
+            }
+        }
+    }
+
+    private async IAsyncEnumerable<RawSource> LoadSiteAsync(SiteSpec site, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var robots = await LoadRobotsAsync(site, cancellationToken);
+        var delay = EffectiveDelay(robots);
+
+        var urls = await ResolveUrlsAsync(site, robots, cancellationToken);
+        if (urls.Count == 0)
+        {
+            logger.LogWarning("Crawler nenašel žádné URL pro {Site} (sitemap ani fallback).", site.DisplayName);
+            yield break;
+        }
+
+        logger.LogInformation("Crawler zpracuje {Count} URL z {Site} (delay {Delay} ms).", urls.Count, site.DisplayName, delay);
 
         var first = true;
         foreach (var url in urls)
@@ -72,6 +90,44 @@ public sealed partial class WebCrawler(
                 yield return source;
             }
         }
+    }
+
+    /// <summary>Plochá pole (Enerkom) tvoří první web; <see cref="IndexerOptions.Sites"/> přidává ostatní.</summary>
+    private List<SiteSpec> ResolveSites()
+    {
+        var sites = new List<SiteSpec>();
+
+        if (!string.IsNullOrWhiteSpace(_options.SitemapUrl) || !string.IsNullOrWhiteSpace(_options.CrawlFallbackRootUrl))
+        {
+            sites.Add(new SiteSpec(
+                _options.SitemapUrl,
+                _options.CrawlFallbackRootUrl,
+                _options.MaxCrawlDepth,
+                new HashSet<string>(_options.ExcludeUrls, StringComparer.OrdinalIgnoreCase)));
+        }
+
+        foreach (var s in _options.Sites)
+        {
+            if (string.IsNullOrWhiteSpace(s.SitemapUrl) && string.IsNullOrWhiteSpace(s.CrawlFallbackRootUrl))
+            {
+                continue;
+            }
+
+            sites.Add(new SiteSpec(
+                s.SitemapUrl,
+                s.CrawlFallbackRootUrl,
+                s.MaxCrawlDepth ?? _options.MaxCrawlDepth,
+                new HashSet<string>(s.ExcludeUrls, StringComparer.OrdinalIgnoreCase)));
+        }
+
+        return sites;
+    }
+
+    /// <summary>Vyřešený web s aplikovanými defaulty.</summary>
+    private sealed record SiteSpec(string SitemapUrl, string? CrawlFallbackRootUrl, int MaxCrawlDepth, HashSet<string> Exclude)
+    {
+        public string DisplayName =>
+            !string.IsNullOrWhiteSpace(CrawlFallbackRootUrl) ? CrawlFallbackRootUrl! : SitemapUrl;
     }
 
     private RawSource CleanPage(string url, string html)
@@ -112,32 +168,32 @@ public sealed partial class WebCrawler(
         return doc.QuerySelector("h1")?.TextContent.Trim();
     }
 
-    private async Task<IReadOnlyList<string>> ResolveUrlsAsync(RobotsTxt robots, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<string>> ResolveUrlsAsync(SiteSpec site, RobotsTxt robots, CancellationToken cancellationToken)
     {
-        var exclude = new HashSet<string>(_options.ExcludeUrls, StringComparer.OrdinalIgnoreCase);
+        var exclude = site.Exclude;
 
-        if (!string.IsNullOrWhiteSpace(_options.SitemapUrl))
+        if (!string.IsNullOrWhiteSpace(site.SitemapUrl))
         {
             try
             {
-                var fromSitemap = await FetchSitemapUrlsAsync(_options.SitemapUrl, depth: 0, cancellationToken);
+                var fromSitemap = await FetchSitemapUrlsAsync(site.SitemapUrl, depth: 0, cancellationToken);
                 var filtered = fromSitemap.Where(u => !exclude.Contains(u)).Distinct().ToList();
                 if (filtered.Count > 0)
                 {
                     return filtered;
                 }
 
-                logger.LogWarning("Sitemap {Url} prázdná — zkouším BFS fallback.", _options.SitemapUrl);
+                logger.LogWarning("Sitemap {Url} prázdná — zkouším BFS fallback.", site.SitemapUrl);
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Sitemap {Url} se nepodařilo načíst — zkouším BFS fallback.", _options.SitemapUrl);
+                logger.LogWarning(ex, "Sitemap {Url} se nepodařilo načíst — zkouším BFS fallback.", site.SitemapUrl);
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(_options.CrawlFallbackRootUrl))
+        if (!string.IsNullOrWhiteSpace(site.CrawlFallbackRootUrl))
         {
-            return await CrawlBfsAsync(_options.CrawlFallbackRootUrl!, robots, exclude, cancellationToken);
+            return await CrawlBfsAsync(site, robots, exclude, cancellationToken);
         }
 
         return [];
@@ -181,10 +237,10 @@ public sealed partial class WebCrawler(
         return urls;
     }
 
-    private async Task<List<string>> CrawlBfsAsync(string rootUrl, RobotsTxt robots, HashSet<string> exclude, CancellationToken cancellationToken)
+    private async Task<List<string>> CrawlBfsAsync(SiteSpec site, RobotsTxt robots, HashSet<string> exclude, CancellationToken cancellationToken)
     {
         const int maxPages = 200;
-        var root = new Uri(rootUrl);
+        var root = new Uri(site.CrawlFallbackRootUrl!);
         var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var result = new List<string>();
         var queue = new Queue<(string Url, int Depth)>();
@@ -197,7 +253,7 @@ public sealed partial class WebCrawler(
             cancellationToken.ThrowIfCancellationRequested();
             var (url, depth) = queue.Dequeue();
 
-            if (!visited.Add(url) || exclude.Contains(url) || depth > _options.MaxCrawlDepth)
+            if (!visited.Add(url) || exclude.Contains(url) || depth > site.MaxCrawlDepth)
             {
                 continue;
             }
@@ -228,7 +284,7 @@ public sealed partial class WebCrawler(
 
             result.Add(url);
 
-            if (depth < _options.MaxCrawlDepth)
+            if (depth < site.MaxCrawlDepth)
             {
                 foreach (var link in ExtractLinks(html, uri))
                 {
@@ -262,16 +318,16 @@ public sealed partial class WebCrawler(
         }
     }
 
-    private async Task<RobotsTxt> LoadRobotsAsync(CancellationToken cancellationToken)
+    private async Task<RobotsTxt> LoadRobotsAsync(SiteSpec site, CancellationToken cancellationToken)
     {
         if (!_options.RespectRobotsCrawlDelay)
         {
             return RobotsTxt.Empty;
         }
 
-        var baseUrl = !string.IsNullOrWhiteSpace(_options.CrawlFallbackRootUrl)
-            ? _options.CrawlFallbackRootUrl
-            : _options.SitemapUrl;
+        var baseUrl = !string.IsNullOrWhiteSpace(site.CrawlFallbackRootUrl)
+            ? site.CrawlFallbackRootUrl
+            : site.SitemapUrl;
 
         if (string.IsNullOrWhiteSpace(baseUrl))
         {

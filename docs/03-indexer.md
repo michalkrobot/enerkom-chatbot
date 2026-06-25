@@ -34,8 +34,10 @@ Celá pipeline běží sekvenčně přes zdroje; embeddings se dávkují. Žádn
 
 > **Stav webu (ověřeno 2026-06-25):** `https://www.enerkomhp.cz/sitemap.xml` existuje a je validní — **17 URL**. `robots.txt` odkazuje na sitemap, nastavuje `Crawl-delay: 10`, blokuje jen `/servers/frontend/`. → Crawler pojede přes sitemap (fallback BFS netřeba). Respektovat crawl-delay (konfig `RequestDelayMs`/`RespectRobotsCrawlDelay`). Vyřadit duplicitní `/kopie-z-proc-se-zapojit/` (konfig `ExcludeUrls`). Stránky `/l/clanek-s-obrazky/`, `/l/novy-spot/` jsou obrázkové → očekávat málo textu.
 
+- **Více webů:** crawler projde víc webů v jednom běhu. První web je ploché `Indexer:SitemapUrl`/`CrawlFallbackRootUrl` (Enerkom); další se přidávají do `Indexer:Sites[]` (každý má vlastní `SitemapUrl`, `CrawlFallbackRootUrl`, volitelně `MaxCrawlDepth`, `ExcludeUrls`). Aktuálně navíc **EDC** (`https://www.edc-cr.cz/` — oficiální sdílení elektřiny), vyřazeny netextové stránky (`/vyhledavani/`, `/kariera/`, potvrzení newsletteru).
+  - **Pozor — sweep maže globálně** (`DELETE … WHERE indexing_run <> @run`): každý běh proto musí projít *všechny* weby, jinak by smazal chunky webu, který se zrovna nekrolloval. Proto jeden společný běh (1×/den), ne oddělené joby s různou kadencí.
 - Vstup: URL `sitemap.xml` (konfigurovatelně). Z něj seznam `<loc>` URL.
-- Odfiltrovat URL z `Indexer:ExcludeUrls` (duplicitní/testovací stránky).
+- Odfiltrovat URL z `ExcludeUrls` daného webu (duplicitní/testovací/netextové stránky).
   - Fallback bez sitemap: BFS crawl od kořenové URL, jen stejná doména, max hloubka N (konfigurovatelné), respektovat `robots.txt`.
 - Pro každou URL: stáhnout HTML (HttpClient s timeoutem + slušný User-Agent).
 - **Čištění HTML (AngleSharp):**

@@ -21,7 +21,7 @@ public sealed class ChatServiceTests
         var promptBuilder = new PromptBuilder(Microsoft.Extensions.Options.Options.Create(new OrgOptions
         {
             Name = "Enerkom HP",
-            Contact = "info@enerkomhp.cz",
+            ContactUrl = "https://www.enerkomhp.cz/kontakt/",
         }));
 
         return new ChatService(

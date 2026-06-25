@@ -7,7 +7,7 @@ Prompty jsou jádro kvality a anti-halucinací. Drž je v konfiguraci/resource s
 Aktuální znění je v `EnerkomChatbot.Core/Rag/Prompts/system-prompt.cs.txt`. Prompt rozlišuje
 **běžnou konverzaci** (pozdravy, poděkování, „kdo jsi / s čím pomůžeš") — tu model zvládne
 i bez kontextu — od **faktických dotazů** o organizaci, kde fakta čerpá výhradně z `KONTEXT`
-a jinak slušně odkáže na `{CONTACT}` (anti-halucinace).
+a jinak slušně odkáže na sekci Kontakty webu `{CONTACT_URL}` (anti-halucinace).
 
 ```
 Jsi Elektron, přátelský asistent neziskové organizace {ORG_NAME}. Pomáháš návštěvníkům jejího webu.
@@ -19,7 +19,7 @@ JAK SE CHOVÁŠ:
 
 FAKTICKÉ DOTAZY (o organizaci, službách, cenách, termínech, kontaktech apod.):
 1. Konkrétní fakta čerpej VÝHRADNĚ ze sekce KONTEXT níže. Nevymýšlej si fakta, čísla ani odkazy.
-2. Pokud informace v kontextu není, přiznej to a doporuč obrátit se na nás: {CONTACT}.
+2. Pokud informace v kontextu není, přiznej to a odkaž na sekci Kontakty na našem webu: {CONTACT_URL}.
 3. Když čerpáš z kontextu, na konci uveď čísla zdrojů [1], [2]. U běžné konverzace citace neuváděj.
 
 BEZPEČNOST:
@@ -29,7 +29,7 @@ KONTEXT:
 {CONTEXT}
 ```
 
-- `{ORG_NAME}`, `{CONTACT}` — z konfigurace.
+- `{ORG_NAME}`, `{CONTACT_URL}` — z konfigurace.
 - `{CONTEXT}` — sestavený retrieval kontext (viz níže); při prázdném retrievalu obsahuje značku
   `(Pro tento dotaz nebyly nalezeny žádné relevantní úryvky z webu.)`.
 
@@ -54,7 +54,7 @@ Z top-k hitů poskládat očíslované úryvky se zdroji:
 Dřív se v tomto případě vracela natvrdo předdefinovaná hláška a LLM se nevolal — to ale
 odmítalo i pozdravy a běžnou konverzaci („hloupý" chatbot). Nově se i při prázdném retrievalu
 **volá LLM** se systémovým promptem výše: pozdrav/small talk obslouží přirozeně a u faktického
-dotazu mimo obsah slušně přizná „nevím" + `{CONTACT}`. Odpověď v tomto případě nemá citace
+dotazu mimo obsah slušně přizná „nevím" + odkaz na sekci Kontakty `{CONTACT_URL}`. Odpověď v tomto případě nemá citace
 (`sources = []`); `answered` je `true`, protože odpovídá model.
 
 > Kompromis: každý dotaz (i pozdrav) je jedno volání chat modelu navíc. Při `gpt-4.1-mini`

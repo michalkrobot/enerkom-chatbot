@@ -6,5 +6,7 @@ public sealed class OrgOptions
     public const string SectionName = "Org";
 
     public string Name { get; set; } = "Enerkom HP";
-    public string Contact { get; set; } = "info@enerkomhp.cz";
+
+    /// <summary>Odkaz na sekci Kontakty webu, kam bot odkáže, když odpověď nezná.</summary>
+    public string ContactUrl { get; set; } = "https://www.enerkomhp.cz/kontakt/";
 }

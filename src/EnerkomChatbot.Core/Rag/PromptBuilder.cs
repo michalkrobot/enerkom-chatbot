@@ -26,7 +26,7 @@ public sealed class PromptBuilder
     public string BuildSystemPrompt(IReadOnlyList<SearchResult> hits) =>
         Template
             .Replace("{ORG_NAME}", _org.Name)
-            .Replace("{CONTACT}", _org.Contact)
+            .Replace("{CONTACT_URL}", _org.ContactUrl)
             .Replace("{CONTEXT}", BuildContext(hits));
 
     /// <summary>Hláška v kontextu, když retrieval nic nenašel (pozdravy a běžnou konverzaci LLM zvládne i tak).</summary>
