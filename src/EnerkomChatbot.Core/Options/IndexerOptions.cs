@@ -9,6 +9,13 @@ public sealed class IndexerOptions
     public string? CrawlFallbackRootUrl { get; set; }
     public int MaxCrawlDepth { get; set; } = 3;
 
+    /// <summary>
+    /// Další weby k procházení. Ploché <see cref="SitemapUrl"/>/<see cref="CrawlFallbackRootUrl"/>
+    /// tvoří první web (zpětná kompatibilita); zde se přidávají ostatní (např. EDC).
+    /// Všechny weby se crawlují v jednom běhu (sweep maže globálně — viz docs/03-indexer.md).
+    /// </summary>
+    public List<WebSiteOptions> Sites { get; set; } = [];
+
     /// <summary>Složka s dokumenty (PDF/DOCX/MD/TXT). Dev: lokální FS.</summary>
     public string DocumentsPath { get; set; } = "data/knowledge-base";
 

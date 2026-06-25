@@ -141,6 +141,11 @@ az containerapp job create `
         "AzureOpenAI__EmbeddingDeployment=$EmbedDeployment" `
         "AzureOpenAI__EmbeddingDimensions=$EmbedDimensions" `
         "Indexer__SitemapUrl=https://www.enerkomhp.cz/sitemap.xml" `
+        "Indexer__Sites__0__SitemapUrl=https://www.edc-cr.cz/wp-sitemap.xml" `
+        "Indexer__Sites__0__CrawlFallbackRootUrl=https://www.edc-cr.cz/" `
+        "Indexer__Sites__0__ExcludeUrls__0=https://www.edc-cr.cz/vyhledavani/" `
+        "Indexer__Sites__0__ExcludeUrls__1=https://www.edc-cr.cz/kariera/" `
+        "Indexer__Sites__0__ExcludeUrls__2=https://www.edc-cr.cz/potvrzeni-odberu-newsletteru/" `
         "Indexer__DocumentsPath=/app/data/knowledge-base"
 
 Write-Host "`n=== 6/6 Výsledek ===" -ForegroundColor Cyan
