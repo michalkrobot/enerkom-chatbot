@@ -29,9 +29,18 @@ public sealed class PromptBuilder
             .Replace("{CONTACT}", _org.Contact)
             .Replace("{CONTEXT}", BuildContext(hits));
 
+    /// <summary>Hláška v kontextu, když retrieval nic nenašel (pozdravy a běžnou konverzaci LLM zvládne i tak).</summary>
+    public const string EmptyContext =
+        "(Pro tento dotaz nebyly nalezeny žádné relevantní úryvky z webu.)";
+
     /// <summary>Očíslované úryvky se zdroji. Číslo [n] koresponduje s pořadím v <see cref="BuildSources"/>.</summary>
     public static string BuildContext(IReadOnlyList<SearchResult> hits)
     {
+        if (hits.Count == 0)
+        {
+            return EmptyContext;
+        }
+
         var sb = new StringBuilder();
         for (var i = 0; i < hits.Count; i++)
         {
@@ -57,11 +66,6 @@ public sealed class PromptBuilder
             Uri = h.SourceUri,
             Type = h.SourceType,
         })];
-
-    /// <summary>Předdefinovaná odpověď, když retrieval nic nenajde (negeneruje se přes LLM).</summary>
-    public string FallbackAnswer() =>
-        $"Na tuto otázku jsem ve zdrojích webu nenašel odpověď. Zkuste prosím dotaz " +
-        $"přeformulovat, nebo se obraťte přímo na nás: {_org.Contact}.";
 
     private static string LoadTemplate()
     {

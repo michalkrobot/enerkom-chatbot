@@ -38,18 +38,19 @@ public sealed class ChatApiTests(ChatApiFactory factory) : IClassFixture<ChatApi
     }
 
     [Fact]
-    public async Task Json_NoHits_ReturnsFallbackAnsweredFalse()
+    public async Task Json_NoHits_StillAnswersViaLlmWithoutSources()
     {
         factory.GivenHits(); // prázdné
+        factory.GivenCompleteAnswer("Dobrý den, rád pomůžu. 🙂");
         var client = factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/api/chat?stream=false", new { question = "Jaké je počasí?" });
+        var response = await client.PostAsJsonAsync("/api/chat?stream=false", new { question = "Ahoj" });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var dto = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.False(dto.GetProperty("answered").GetBoolean());
+        Assert.True(dto.GetProperty("answered").GetBoolean());
         Assert.Equal(0, dto.GetProperty("sources").GetArrayLength());
-        Assert.Contains("nenašel", dto.GetProperty("answer").GetString());
+        Assert.Contains("pomůžu", dto.GetProperty("answer").GetString());
     }
 
     [Theory]
@@ -89,14 +90,15 @@ public sealed class ChatApiTests(ChatApiFactory factory) : IClassFixture<ChatApi
     }
 
     [Fact]
-    public async Task Sse_NoHits_EmitsFallbackAndAnsweredFalse()
+    public async Task Sse_NoHits_StreamsLlmAnswerWithoutSources()
     {
         factory.GivenHits();
+        factory.GivenStreamedAnswer("Dobrý ", "den, ", "rád pomůžu.");
         var client = factory.CreateClient();
 
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/chat")
         {
-            Content = new StringContent("""{"question":"mimo obsah"}""", Encoding.UTF8, "application/json"),
+            Content = new StringContent("""{"question":"ahoj"}""", Encoding.UTF8, "application/json"),
         };
 
         var response = await client.SendAsync(request);
@@ -104,7 +106,7 @@ public sealed class ChatApiTests(ChatApiFactory factory) : IClassFixture<ChatApi
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("event: token", body);
-        Assert.Contains("\"answered\":false", body);
+        Assert.Contains("\"answered\":true", body);
     }
 
     [Fact]

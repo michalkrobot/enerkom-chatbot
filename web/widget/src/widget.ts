@@ -1,56 +1,106 @@
-// EnerkomChatbot chat widget — embeddable IIFE entry. Auto-initialises on load.
+// EnerkomChatbot chat widget — embeddable IIFE entry (variant 2). Auto-initialises on load.
 //
 // Embed:
 //   <script src=".../widget.js"
 //           data-api-url="https://.../api/chat"
-//           data-org-name="Enerkom HP"
-//           data-primary-color="#1D9E75" defer></script>
+//           data-org-name="Enerkom HP" defer></script>
 //
-// Self-contained: lottie-web, the Elektron Lottie, the launcher avatar and all
-// CSS are bundled. The widget renders inside a Shadow DOM so host-page styles
-// neither leak in nor out, and it never holds an API key — it only calls our API.
+// Variant 2: the Elektron mascot lives in its own green stage beside the chat and reacts to
+// the conversation (waves on open, thinks, talks, celebrates with confetti, looks confused when
+// it has no answer). Mascot is a single PNG animated with CSS — no Lottie, smaller bundle.
+// Everything (mascot PNG + Baloo 2/Nunito fonts + CSS) is inlined; the widget renders inside a
+// Shadow DOM so host-page styles neither leak in nor out, and it never holds an API key.
 
-import { Mascot } from "./mascot";
 import { buildCss } from "./styles";
 import { ChatApiError, GENERIC_ERROR, sendChat } from "./api";
 import type { Message, Source, WidgetConfig } from "./types";
-// Inlined as a base64 data: URI at build time (no external request).
-import avatarUrl from "../assets/elektron-head.png?inline";
 
-const GREETING =
-  "Dobrý den, zeptejte se mě na cokoli o naší organizaci.";
+// Inlined as base64 data: URIs at build time (no external requests).
+import mascotUrl from "../assets/elektron-mascot.png?inline";
+import balooLatin from "../assets/fonts/baloo2-latin.woff2?inline";
+import balooExt from "../assets/fonts/baloo2-latinext.woff2?inline";
+import nunitoLatin from "../assets/fonts/nunito-latin.woff2?inline";
+import nunitoExt from "../assets/fonts/nunito-latinext.woff2?inline";
+
+type State = "idle" | "thinking" | "talking" | "happy" | "wave" | "confused";
+
+const GREETING = "Dobrý den, jsem Elektron. Zeptejte se mě na cokoli o naší organizaci ⚡";
+const NOT_FOUND =
+  "To bohužel přesně nevím. Zkuste dotaz prosím přeformulovat, nebo nás kontaktujte.";
 const HISTORY_LIMIT = 6;
 
-/** Escape text for safe insertion into the DOM (we never use innerHTML with input). */
-function escapeText(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+const STATUS: Record<State, string> = {
+  idle: "Online",
+  thinking: "Přemýšlím…",
+  talking: "Odpovídám…",
+  happy: "Jupí! 🎉",
+  wave: "Vítejte!",
+  confused: "Hmm…?",
+};
+
+const GRATITUDE = /děk|díky|dik|super|paráda|skvěl[áée... ]?|wow|👍|🙏/i;
+
+const UNICODE_EXT =
+  "U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF";
+const UNICODE_LAT =
+  "U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD";
+
+let fontsRequested = false;
+
+/** Load Baloo 2 + Nunito via the FontFace API (works inside Shadow DOM, unlike @font-face). */
+function loadFonts(): void {
+  if (fontsRequested) return;
+  const fontSet = (document as Document & { fonts?: FontFaceSet }).fonts;
+  if (!fontSet || typeof FontFace === "undefined") return;
+  fontsRequested = true;
+
+  const defs: ReadonlyArray<[string, string, string, string]> = [
+    ["Baloo 2", balooExt, "500 800", UNICODE_EXT],
+    ["Baloo 2", balooLatin, "500 800", UNICODE_LAT],
+    ["Nunito", nunitoExt, "400 800", UNICODE_EXT],
+    ["Nunito", nunitoLatin, "400 800", UNICODE_LAT],
+  ];
+
+  for (const [family, url, weight, unicodeRange] of defs) {
+    try {
+      const face = new FontFace(family, `url(${url})`, { weight, unicodeRange, display: "swap" });
+      void face.load().then((f) => fontSet.add(f)).catch(() => {});
+    } catch {
+      // ignore — system fonts are a fine fallback
+    }
+  }
 }
 
 function readConfig(): WidgetConfig | null {
   const script =
-    (document.currentScript as HTMLScriptElement | null) ??
-    findScriptByDataAttr();
+    (document.currentScript as HTMLScriptElement | null) ?? findScriptByDataAttr();
   if (!script) return null;
 
   const apiUrl = script.getAttribute("data-api-url")?.trim();
   if (!apiUrl) {
-    // eslint-disable-next-line no-console
     console.warn("[enerkom-widget] missing data-api-url — widget not initialised.");
     return null;
   }
   return {
     apiUrl,
     orgName: script.getAttribute("data-org-name")?.trim() || "naše organizace",
-    primaryColor: script.getAttribute("data-primary-color")?.trim() || undefined,
+    // data-primary-color is intentionally ignored in variant 2 (green Elektron identity).
+    primaryColor: undefined,
   };
 }
 
 function findScriptByDataAttr(): HTMLScriptElement | null {
   const scripts = document.querySelectorAll<HTMLScriptElement>("script[data-api-url]");
   return scripts.length > 0 ? scripts[scripts.length - 1] : null;
+}
+
+function el<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  className?: string,
+): HTMLElementTagNameMap[K] {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  return node;
 }
 
 class ChatWidget {
@@ -60,16 +110,18 @@ class ChatWidget {
 
   private launcher!: HTMLButtonElement;
   private panel!: HTMLDivElement;
-  private body!: HTMLDivElement;
+  private stage!: HTMLDivElement;
+  private statusEl!: HTMLSpanElement;
+  private confettiBox!: HTMLDivElement;
+  private msgs!: HTMLDivElement;
+  private typing!: HTMLDivElement;
   private input!: HTMLInputElement;
   private sendBtn!: HTMLButtonElement;
-  private mascotMount!: HTMLDivElement;
 
-  private mascot: Mascot | null = null;
-  private mascotStarted = false;
   private readonly history: Message[] = [];
   private greeted = false;
   private busy = false;
+  private timers: number[] = [];
 
   constructor(cfg: WidgetConfig) {
     this.cfg = cfg;
@@ -77,84 +129,126 @@ class ChatWidget {
     this.host.setAttribute("data-enerkom-widget", "");
     this.shadow = this.host.attachShadow({ mode: "open" });
     document.body.appendChild(this.host);
+    loadFonts();
     this.render();
   }
 
   private render(): void {
     const style = document.createElement("style");
-    style.textContent = buildCss(avatarUrl);
+    style.textContent = buildCss();
     this.shadow.appendChild(style);
 
-    const root = document.createElement("div");
-    root.className = "ek-root";
+    const root = el("div", "ek-root");
 
-    // optional brand colour override (--mid)
-    if (this.cfg.primaryColor) {
-      root.style.setProperty("--mid", this.cfg.primaryColor);
-    }
-
-    // launcher
-    this.launcher = document.createElement("button");
-    this.launcher.className = "ek-launch";
+    // ---- launcher ----
+    this.launcher = el("button", "ek-launch");
     this.launcher.type = "button";
-    this.launcher.setAttribute("aria-label", "Otevřít chat");
-    const av = document.createElement("span");
-    av.className = "av";
+    this.launcher.setAttribute("aria-label", "Otevřít chat s Elektronem");
+    const av = el("span", "av");
     av.setAttribute("aria-hidden", "true");
-    this.launcher.appendChild(av);
-    this.launcher.appendChild(document.createTextNode("Zeptejte se Elektrona"));
+    const avImg = el("img");
+    avImg.src = mascotUrl;
+    avImg.alt = "";
+    av.appendChild(avImg);
+    this.launcher.append(av, document.createTextNode("Zeptejte se Elektrona"));
     this.launcher.addEventListener("click", () => this.open());
 
-    // panel
-    this.panel = document.createElement("div");
-    this.panel.className = "ek-panel";
+    // ---- panel ----
+    this.panel = el("div", "ek-panel");
     this.panel.setAttribute("role", "dialog");
-    this.panel.setAttribute("aria-modal", "false");
     this.panel.setAttribute("aria-label", `Chat – ${this.cfg.orgName}`);
+    this.panel.append(this.buildStage(), this.buildChat());
+    this.panel.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") this.close();
+    });
 
-    // header
-    const head = document.createElement("div");
-    head.className = "ek-head";
-    const mascotWrap = document.createElement("div");
-    mascotWrap.className = "mascot";
-    this.mascotMount = document.createElement("div");
-    mascotWrap.appendChild(this.mascotMount);
-    const meta = document.createElement("div");
-    meta.className = "meta";
-    const name = document.createElement("b");
+    root.append(this.launcher, this.panel);
+    this.shadow.appendChild(root);
+  }
+
+  private buildStage(): HTMLDivElement {
+    this.stage = el("div", "ek-stage s-idle");
+
+    const blobA = el("div", "blob a");
+    const blobB = el("div", "blob b");
+
+    const pill = el("div", "ek-pill");
+    const pillInner = el("div");
+    pillInner.append(el("span", "dot"));
+    this.statusEl = el("span");
+    this.statusEl.textContent = STATUS.idle;
+    pillInner.appendChild(this.statusEl);
+    pill.appendChild(pillInner);
+
+    this.confettiBox = el("div", "ek-confetti");
+
+    const mascot = el("div", "ek-mascot");
+    mascot.append(
+      this.bubble("think", [el("span"), el("span"), el("span")], true),
+      this.bubble("wave", [document.createTextNode("Ahoj!")]),
+      this.bubble("conf", [document.createTextNode("?")]),
+      el("div", "ek-shadow"),
+    );
+    const body3d = el("div", "ek-body3d");
+    const mImg = el("img");
+    mImg.src = mascotUrl;
+    mImg.alt = "Elektron";
+    body3d.append(mImg, el("div", "ek-eye l"), el("div", "ek-eye r"));
+    mascot.appendChild(body3d);
+
+    this.stage.append(blobA, blobB, pill, this.confettiBox, mascot);
+    return this.stage;
+  }
+
+  private bubble(kind: "think" | "wave" | "conf", children: Node[], dots = false): HTMLDivElement {
+    const wrap = el("div", `ek-bubble ${kind}`);
+    const box = el("div", "box");
+    box.append(...children);
+    if (!dots) box.appendChild(el("div", "nib"));
+    wrap.appendChild(box);
+    if (dots) wrap.appendChild(el("div", "tail"));
+    return wrap;
+  }
+
+  private buildChat(): HTMLDivElement {
+    const chat = el("div", "ek-chat");
+
+    const head = el("div", "ek-head");
+    const logo = el("div", "logo");
+    const bolt = el("span");
+    bolt.textContent = "⚡";
+    logo.appendChild(bolt);
+    const meta = el("div", "meta");
+    const name = el("b");
     name.textContent = "Elektron";
-    const org = document.createElement("span");
+    const org = el("small");
     org.textContent = this.cfg.orgName;
-    meta.append(name, document.createElement("br"), org);
-    const close = document.createElement("button");
-    close.className = "x";
+    meta.append(name, org);
+    const close = el("button", "x");
     close.type = "button";
     close.setAttribute("aria-label", "Zavřít chat");
     close.textContent = "×";
     close.addEventListener("click", () => this.close());
-    head.append(mascotWrap, meta, close);
+    head.append(logo, meta, close);
 
-    // body
-    this.body = document.createElement("div");
-    this.body.className = "ek-body";
-    this.body.setAttribute("role", "log");
-    this.body.setAttribute("aria-live", "polite");
+    this.msgs = el("div", "ek-msgs");
+    this.msgs.setAttribute("role", "log");
+    this.msgs.setAttribute("aria-live", "polite");
+    this.typing = el("div", "typing");
+    this.typing.append(el("span"), el("span"), el("span"));
+    this.msgs.appendChild(this.typing);
 
-    // footer
-    const foot = document.createElement("div");
-    foot.className = "ek-foot";
-    this.input = document.createElement("input");
+    const foot = el("div", "ek-foot");
+    this.input = el("input");
     this.input.type = "text";
     this.input.setAttribute("autocomplete", "off");
-    this.input.placeholder = "Napište dotaz…";
+    this.input.placeholder = "Napište Elektronovi…";
     this.input.setAttribute("aria-label", "Napište dotaz");
-    this.sendBtn = document.createElement("button");
+    this.sendBtn = el("button");
     this.sendBtn.type = "button";
     this.sendBtn.setAttribute("aria-label", "Odeslat");
     this.sendBtn.textContent = "➤";
     this.sendBtn.addEventListener("click", () => void this.send());
-    foot.append(this.input, this.sendBtn);
-
     this.input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
@@ -163,100 +257,97 @@ class ChatWidget {
         this.close();
       }
     });
-    this.panel.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") this.close();
-    });
+    foot.append(this.input, this.sendBtn);
 
-    this.panel.append(head, this.body, foot);
-    root.append(this.launcher, this.panel);
-    this.shadow.appendChild(root);
+    chat.append(head, this.msgs, foot);
+    return chat;
   }
 
-  private async open(): Promise<void> {
+  // ---- state machine ----
+  private clearTimers(): void {
+    for (const t of this.timers) clearTimeout(t);
+    this.timers = [];
+  }
+
+  private setState(state: State): void {
+    this.stage.className = `ek-stage s-${state}`;
+    this.statusEl.textContent = STATUS[state];
+    this.msgs.classList.toggle("thinking", state === "thinking");
+  }
+
+  private settleToIdle(delayMs: number): void {
+    this.timers.push(window.setTimeout(() => this.setState("idle"), delayMs));
+  }
+
+  private buildConfetti(): void {
+    if (this.confettiBox.childElementCount > 0) return;
+    const colors = ["#f4c430", "#ffd95e", "#8fd44f", "#ffffff", "#c6f7cd", "#5bbf57"];
+    for (let i = 0; i < 14; i++) {
+      const s = el("div");
+      const left = Math.round(Math.random() * 92) + 4;
+      const size = 6 + Math.round(Math.random() * 6);
+      const delay = (Math.random() * 0.9).toFixed(2);
+      const dur = (1.1 + Math.random() * 0.8).toFixed(2);
+      s.style.cssText =
+        `position:absolute;top:0;left:${left}%;width:${size}px;height:${size}px;` +
+        `background:${colors[i % colors.length]};border-radius:${i % 2 ? "50%" : "2px"};` +
+        `animation:ek-confettiFall ${dur}s linear ${delay}s infinite;`;
+      this.confettiBox.appendChild(s);
+    }
+  }
+
+  // ---- panel open/close ----
+  private open(): void {
     this.panel.classList.add("open");
     this.launcher.hidden = true;
-
-    if (!this.mascot) {
-      this.mascot = new Mascot(this.mascotMount);
-      try {
-        await this.mascot.ready;
-      } catch {
-        // mascot is decorative — chat still works without it
-      }
-    }
-    if (this.mascot && this.mascotStarted) {
-      // re-entering an open panel — settle back to idle
-      this.mascot.set("idle");
-    }
-    this.mascotStarted = true;
-
+    this.input.focus();
     if (!this.greeted) {
       this.greeted = true;
       this.addBotMessage(GREETING);
+      this.clearTimers();
+      this.setState("wave");
+      this.settleToIdle(1800);
     }
-    this.input.focus();
   }
 
   private close(): void {
     this.panel.classList.remove("open");
     this.launcher.hidden = false;
-    // Panel is display:none while closed, so the Lottie SVG is not painted —
-    // no extra pause needed (Mascot's public API is set/current/destroy only).
+    this.clearTimers();
+    this.setState("idle");
     this.launcher.focus();
   }
 
+  // ---- messages ----
   private addUserMessage(text: string): void {
-    const el = document.createElement("div");
-    el.className = "msg user";
-    el.textContent = text;
-    this.body.appendChild(el);
+    const m = el("div", "msg user");
+    m.textContent = text;
+    this.msgs.insertBefore(m, this.typing);
     this.scrollToBottom();
   }
 
   private addBotMessage(text: string): HTMLDivElement {
-    const el = document.createElement("div");
-    el.className = "msg bot";
-    el.textContent = text;
-    this.body.appendChild(el);
+    const m = el("div", "msg bot");
+    m.textContent = text;
+    this.msgs.insertBefore(m, this.typing);
     this.scrollToBottom();
-    return el;
-  }
-
-  private addTypingIndicator(): HTMLDivElement {
-    const el = document.createElement("div");
-    el.className = "msg bot";
-    const dots = document.createElement("span");
-    dots.className = "dots";
-    dots.append(
-      document.createElement("span"),
-      document.createElement("span"),
-      document.createElement("span"),
-    );
-    el.appendChild(dots);
-    this.body.appendChild(el);
-    this.scrollToBottom();
-    return el;
+    return m;
   }
 
   private renderSources(parent: HTMLDivElement, sources: Source[]): void {
     if (sources.length === 0) return;
-    const wrap = document.createElement("div");
-    wrap.className = "sources";
+    const wrap = el("div", "sources");
     sources.forEach((s, i) => {
       if (!s || typeof s.uri !== "string") return;
-      const a = document.createElement("a");
-      // Only allow http(s) links to open externally; otherwise render as text.
-      const safe = /^https?:\/\//i.test(s.uri);
-      if (safe) {
+      const a = el("a");
+      if (/^https?:\/\//i.test(s.uri)) {
         a.href = s.uri;
         a.target = "_blank";
         a.rel = "noopener noreferrer";
       }
-      const num = document.createElement("span");
-      num.className = "num";
+      const num = el("span", "num");
       num.textContent = `[${i + 1}]`;
-      a.appendChild(num);
-      a.appendChild(document.createTextNode(s.title || s.uri));
+      a.append(num, document.createTextNode(s.title || s.uri));
       wrap.appendChild(a);
     });
     if (wrap.childElementCount > 0) {
@@ -266,9 +357,10 @@ class ChatWidget {
   }
 
   private scrollToBottom(): void {
-    this.body.scrollTop = this.body.scrollHeight;
+    this.msgs.scrollTop = this.msgs.scrollHeight;
   }
 
+  // ---- send ----
   private async send(): Promise<void> {
     if (this.busy) return;
     const question = this.input.value.trim();
@@ -277,11 +369,10 @@ class ChatWidget {
     this.busy = true;
     this.sendBtn.disabled = true;
     this.input.value = "";
+    this.clearTimers();
     this.addUserMessage(question);
     this.history.push({ role: "user", content: question });
-
-    this.mascot?.set("thinking");
-    const typing = this.addTypingIndicator();
+    this.setState("thinking");
 
     let bubble: HTMLDivElement | null = null;
     let answerText = "";
@@ -290,58 +381,54 @@ class ChatWidget {
 
     const ensureBubble = (): HTMLDivElement => {
       if (!bubble) {
-        typing.remove();
-        bubble = document.createElement("div");
-        bubble.className = "msg bot";
-        this.body.appendChild(bubble);
+        bubble = el("div", "msg bot");
+        this.msgs.insertBefore(bubble, this.typing);
       }
       return bubble;
     };
 
     try {
-      await sendChat(
-        this.cfg.apiUrl,
-        { question, history: this.history.slice(-HISTORY_LIMIT) },
-        {
-          onToken: (text) => {
-            if (firstToken) {
-              firstToken = false;
-              this.mascot?.set("talking");
-            }
-            answerText += text;
-            const b = ensureBubble();
-            b.textContent = answerText; // textContent — no HTML injection
-            this.scrollToBottom();
-          },
-          onSources: (s) => {
-            sourcesBuffer.length = 0;
-            sourcesBuffer.push(...s);
-          },
-          onDone: (answered) => {
-            const b = ensureBubble();
-            if (answerText.length === 0) {
-              b.textContent = answered
-                ? ""
-                : "To bohužel přesně nevím. Zkuste dotaz prosím přeformulovat, nebo nás kontaktujte.";
-            }
-            this.renderSources(b, sourcesBuffer);
-            if (answered) {
-              this.history.push({ role: "assistant", content: answerText });
-            }
-            this.mascot?.set(answered ? "idle" : "notfound");
-          },
+      await sendChat(this.cfg.apiUrl, { question, history: this.history.slice(-HISTORY_LIMIT) }, {
+        onToken: (text) => {
+          if (firstToken) {
+            firstToken = false;
+            this.setState("talking");
+          }
+          answerText += text;
+          ensureBubble().textContent = answerText; // textContent — no HTML injection
+          this.scrollToBottom();
         },
-      );
+        onSources: (s) => {
+          sourcesBuffer.length = 0;
+          sourcesBuffer.push(...s);
+        },
+        onDone: (answered) => {
+          const b = ensureBubble();
+          if (answerText.length === 0 && !answered) b.textContent = NOT_FOUND;
+          this.renderSources(b, sourcesBuffer);
+          if (answered) {
+            this.history.push({ role: "assistant", content: answerText });
+            if (GRATITUDE.test(question)) {
+              this.buildConfetti();
+              this.setState("happy");
+              this.settleToIdle(1900);
+            } else {
+              this.setState("idle");
+            }
+          } else {
+            this.setState("confused");
+            this.settleToIdle(1400);
+          }
+        },
+      });
     } catch (err) {
-      typing.remove();
-      this.mascot?.set("idle");
-      const message =
-        err instanceof ChatApiError && err.message ? err.message : GENERIC_ERROR;
-      const el = document.createElement("div");
-      el.className = "msg error";
-      el.textContent = message;
-      this.body.appendChild(el);
+      const message = err instanceof ChatApiError && err.message ? err.message : GENERIC_ERROR;
+      const e = el("div", "msg error");
+      e.textContent = message;
+      this.msgs.insertBefore(e, this.typing);
       this.scrollToBottom();
+      this.setState("confused");
+      this.settleToIdle(1400);
     } finally {
       this.busy = false;
       this.sendBtn.disabled = false;
@@ -353,7 +440,7 @@ class ChatWidget {
 function init(): void {
   const cfg = readConfig();
   if (!cfg) return;
-  const start = () => new ChatWidget(cfg);
+  const start = (): ChatWidget => new ChatWidget(cfg);
   if (document.body) {
     start();
   } else {
@@ -362,7 +449,3 @@ function init(): void {
 }
 
 init();
-
-// escapeText is exported only to keep it available for tests / future markdown
-// rendering; the widget itself uses textContent everywhere.
-export { escapeText };

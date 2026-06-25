@@ -10,19 +10,16 @@ public sealed record ChatQuery
 }
 
 /// <summary>
-/// Připravený výsledek retrievalu. Při <see cref="Answered"/> == false se negeneruje přes LLM —
-/// použije se <see cref="FallbackAnswer"/>.
+/// Připravený výsledek retrievalu. Odpověď vždy generuje LLM (i pro pozdravy bez kontextu);
+/// <see cref="Answered"/> je true vždy, když odpovídá model. Citace se odvozují od <see cref="Sources"/>.
 /// </summary>
 public sealed record PreparedChat
 {
     public required bool Answered { get; init; }
     public required IReadOnlyList<Source> Sources { get; init; }
 
-    /// <summary>Zprávy pro LLM (prázdné když Answered == false).</summary>
+    /// <summary>Zprávy pro LLM (systémový prompt + historie + dotaz).</summary>
     public required IReadOnlyList<ChatMessage> Messages { get; init; }
-
-    /// <summary>Předpřipravená odpověď, když retrieval nic nenašel.</summary>
-    public string? FallbackAnswer { get; init; }
 }
 
 /// <summary>Celá (ne-streamovaná) odpověď.</summary>

@@ -46,14 +46,9 @@ public sealed class ChatService(
 
         if (hits.Count == 0)
         {
-            logger.LogInformation("Retrieval prázdný (answered=false) pro dotaz délky {Length}.", question.Length);
-            return new PreparedChat
-            {
-                Answered = false,
-                Sources = [],
-                Messages = [],
-                FallbackAnswer = promptBuilder.FallbackAnswer(),
-            };
+            // Prázdný retrieval neznamená konec — LLM s anti-halucinačním promptem zvládne
+            // pozdravy a běžnou konverzaci a u faktických dotazů slušně odkáže na kontakt.
+            logger.LogInformation("Retrieval prázdný pro dotaz délky {Length} — odpověď bez kontextu.", question.Length);
         }
 
         var systemPrompt = promptBuilder.BuildSystemPrompt(hits);
@@ -66,6 +61,7 @@ public sealed class ChatService(
 
         return new PreparedChat
         {
+            // Answered == true vždy, když odpovídá LLM; rozlišuje se jen přítomnost citací (Sources).
             Answered = true,
             Sources = PromptBuilder.BuildSources(hits),
             Messages = messages,
@@ -80,13 +76,8 @@ public sealed class ChatService(
     public async Task<ChatAnswer> AnswerAsync(ChatQuery query, CancellationToken cancellationToken = default)
     {
         var prepared = await PrepareAsync(query, cancellationToken);
-        if (!prepared.Answered)
-        {
-            return new ChatAnswer { Answer = prepared.FallbackAnswer!, Sources = [], Answered = false };
-        }
-
         var answer = await chatClient.CompleteAsync(prepared.Messages, cancellationToken);
-        return new ChatAnswer { Answer = answer, Sources = prepared.Sources, Answered = true };
+        return new ChatAnswer { Answer = answer, Sources = prepared.Sources, Answered = prepared.Answered };
     }
 
     /// <summary>Ořízne historii na posledních <see cref="MaxHistoryMessages"/> zpráv.</summary>
