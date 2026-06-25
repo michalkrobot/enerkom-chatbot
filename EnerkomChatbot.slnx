@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/EnerkomChatbot.Core/EnerkomChatbot.Core.csproj" />
+    <Project Path="src/EnerkomChatbot.Indexer/EnerkomChatbot.Indexer.csproj" />
+    <Project Path="src/EnerkomChatbot.Api/EnerkomChatbot.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/EnerkomChatbot.Core.Tests/EnerkomChatbot.Core.Tests.csproj" />
+    <Project Path="tests/EnerkomChatbot.Api.Tests/EnerkomChatbot.Api.Tests.csproj" />
+  </Folder>
+</Solution>

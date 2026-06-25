@@ -1,6 +1,6 @@
 # 05 — Prompty
 
-Prompty jsou jádro kvality a anti-halucinací. Drž je v konfiguraci/resource souboru (`Couch.Core/Rag/Prompts`), ne natvrdo v kódu — aby je šlo ladit bez rekompilace logiky.
+Prompty jsou jádro kvality a anti-halucinací. Drž je v konfiguraci/resource souboru (`EnerkomChatbot.Core/Rag/Prompts`), ne natvrdo v kódu — aby je šlo ladit bez rekompilace logiky.
 
 ## Systémový prompt (čeština)
 

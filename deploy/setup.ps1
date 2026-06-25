@@ -2,7 +2,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 # =============================================================================
-# Couch (chatbot) — jednorázový setup Azure infrastruktury
+# EnerkomChatbot — jednorázový setup Azure infrastruktury
 # Nasazuje se VEDLE EDC do stávajícího předplatného (sdílené env + Postgres server).
 # LLM/embeddings: Azure OpenAI. Viz docs/09-azure-deploy.md.
 #

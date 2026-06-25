@@ -8,7 +8,7 @@ Rozpad na samostatné úkoly. Pořadí je zdola nahoru (DB → Core → Indexer 
 
 **T0.1 — Založit solution a projekty**
 - Spec: [01-project-structure.md](01-project-structure.md)
-- Výstup: `Couch.slnx`, projekty `Couch.Core`, `Couch.Indexer`, `Couch.Api`, test projekty; `Directory.Build.props`, `Directory.Packages.props`, `.editorconfig`. TFM `net10.0`, nullable on.
+- Výstup: `EnerkomChatbot.slnx`, projekty `EnerkomChatbot.Core`, `EnerkomChatbot.Indexer`, `EnerkomChatbot.Api`, test projekty; `Directory.Build.props`, `Directory.Packages.props`, `.editorconfig`. TFM `net10.0`, nullable on.
 - Akceptace: `dotnet build` projde; referencemi platí Core ← (Indexer, Api).
 
 ---
@@ -17,7 +17,7 @@ Rozpad na samostatné úkoly. Pořadí je zdola nahoru (DB → Core → Indexer 
 
 **T1.1 — DB schéma + migrační skript**
 - Spec: [02-database.md](02-database.md)
-- Výstup: `src/Couch.Core/Storage/schema.sql` (validní SQL — pozor na `BIGINT GENERATED ALWAYS AS IDENTITY`), idempotentní; `CREATE EXTENSION vector`; tabulky `documents`, `indexing_runs`; HNSW index.
+- Výstup: `src/EnerkomChatbot.Core/Storage/schema.sql` (validní SQL — pozor na `BIGINT GENERATED ALWAYS AS IDENTITY`), idempotentní; `CREATE EXTENSION vector`; tabulky `documents`, `indexing_runs`; HNSW index.
 - Akceptace: skript projde na čisté Postgres instanci s pgvector; index existuje.
 
 **T1.2 — Core modely a abstrakce**

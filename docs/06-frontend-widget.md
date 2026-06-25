@@ -95,7 +95,7 @@ interface WidgetConfig {
 
 ## Styl a izolace
 
-- Veškerý CSS **scoped** pod root prvek widgetu s prefixem tříd (`.couch-chat-…`) nebo v **Shadow DOM** (preferováno) — aby styly webu neovlivnily widget a naopak.
+- Veškerý CSS **scoped** pod root prvek widgetu s prefixem tříd (`.enerkom-chat-…`) nebo v **Shadow DOM** (preferováno) — aby styly webu neovlivnily widget a naopak.
 - Responsivní: na mobilu panel přes celou šířku.
 - Přístupnost: focus management, `aria-label` na tlačítkách, klávesnice (Esc zavře, Enter odešle).
 
@@ -103,7 +103,7 @@ interface WidgetConfig {
 
 - **Vite** v knihovním režimu (`build.lib`) → výstup `widget.js` (IIFE, self-contained), volitelně minifikovaný.
 - Žádný hash v názvu (stabilní URL pro `<script src>`), verzování přes query (`?v=1`).
-- Výstup nasadit jako statický soubor (viz 07 — může hostit i `Couch.Api` ze `wwwroot`, nebo CDN/static storage).
+- Výstup nasadit jako statický soubor (viz 07 — může hostit i `EnerkomChatbot.Api` ze `wwwroot`, nebo CDN/static storage).
 
 ## Bezpečnost
 

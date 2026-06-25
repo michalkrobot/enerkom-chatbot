@@ -1,0 +1,36 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.{cs,csx}]
+indent_size = 4
+# Namespaces
+csharp_style_namespace_declarations = file_scoped:warning
+# var usage
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+# Modern C#
+csharp_style_prefer_primary_constructors = true:suggestion
+csharp_prefer_braces = true:silent
+csharp_style_expression_bodied_methods = when_on_single_line:silent
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+# Naming: async suffix is a convention, not enforced here
+dotnet_diagnostic.CA2007.severity = none
+
+[*.{json,jsonc,yml,yaml,csproj,props,slnx,targets}]
+indent_size = 2
+
+[*.{ts,js,css,html}]
+indent_size = 2
+
+[*.{sql,py}]
+indent_size = 4
+
+[*.md]
+trim_trailing_whitespace = false

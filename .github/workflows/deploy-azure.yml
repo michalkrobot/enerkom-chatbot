@@ -21,6 +21,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ghcr.io vyžaduje malá písmena v názvu image; owner/repo může obsahovat velká.
+      - name: Lowercase image repo
+        run: echo "IMAGE_REPO=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -31,8 +35,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # POZN.: ghcr.io vyžaduje malá písmena v názvu image. Pokud owner/repo
-      # obsahuje velká písmena, nahraď ${{ github.repository }} ručně malými písmeny.
+      # Název image se bere z $IMAGE_REPO (lowercase, viz krok "Lowercase image repo").
       - name: Build and push API image
         uses: docker/build-push-action@v5
         with:
@@ -40,8 +43,8 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}-api:latest
-            ghcr.io/${{ github.repository }}-api:${{ github.sha }}
+            ghcr.io/${{ env.IMAGE_REPO }}-api:latest
+            ghcr.io/${{ env.IMAGE_REPO }}-api:${{ github.sha }}
           provenance: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -53,8 +56,8 @@ jobs:
           file: ./Dockerfile.indexer
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}-indexer:latest
-            ghcr.io/${{ github.repository }}-indexer:${{ github.sha }}
+            ghcr.io/${{ env.IMAGE_REPO }}-indexer:latest
+            ghcr.io/${{ env.IMAGE_REPO }}-indexer:${{ github.sha }}
           provenance: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -69,7 +72,7 @@ jobs:
           az containerapp update \
             --name "$CONTAINERAPP_NAME" \
             --resource-group "$RESOURCE_GROUP" \
-            --image "ghcr.io/${{ github.repository }}-api:${{ github.sha }}" \
+            --image "ghcr.io/${{ env.IMAGE_REPO }}-api:${{ github.sha }}" \
             --revision-suffix "sha-${GITHUB_SHA::7}"
 
       - name: Deploy Indexer job image
@@ -77,4 +80,4 @@ jobs:
           az containerapp job update \
             --name "$INDEXER_JOB_NAME" \
             --resource-group "$RESOURCE_GROUP" \
-            --image "ghcr.io/${{ github.repository }}-indexer:${{ github.sha }}"
+            --image "ghcr.io/${{ env.IMAGE_REPO }}-indexer:${{ github.sha }}"

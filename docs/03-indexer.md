@@ -1,4 +1,4 @@
-# 03 — Indexer (Couch.Indexer)
+# 03 — Indexer (EnerkomChatbot.Indexer)
 
 Dávkový proces. Vstup = zdroje (web + dokumenty), výstup = naplněná tabulka `documents`. Spouští se plánovaně (viz 07).
 
@@ -7,10 +7,10 @@ Dávkový proces. Vstup = zdroje (web + dokumenty), výstup = naplněná tabulka
 Generic Host konzolová app. Argumenty/konfigurace určí, co indexovat:
 
 ```
-Couch.Indexer            # plný běh: web + dokumenty
-Couch.Indexer --web      # jen web
-Couch.Indexer --docs     # jen dokumenty
-Couch.Indexer --dry-run  # nezapisuje do DB, jen vypíše statistiky
+EnerkomChatbot.Indexer            # plný běh: web + dokumenty
+EnerkomChatbot.Indexer --web      # jen web
+EnerkomChatbot.Indexer --docs     # jen dokumenty
+EnerkomChatbot.Indexer --dry-run  # nezapisuje do DB, jen vypíše statistiky
 ```
 
 ## Pipeline (IndexingPipeline)
@@ -60,7 +60,7 @@ Zdroj dokumentů = `Indexer:DocumentsPath`. Dev: lokální složka `data/knowled
 
 Výstup: `RawSource` `{ SourceType, Uri=nazevSouboru, Title=nazevBezPripony, Text }`.
 
-## Chunker (Couch.Core/Rag/Chunker)
+## Chunker (EnerkomChatbot.Core/Rag/Chunker)
 
 Parametry (konfigurovatelné):
 - `MaxTokens = 500`
@@ -77,9 +77,9 @@ Odhad tokenů: jednoduchá heuristika (≈ znaky/4) stačí; přesný tokenizer 
 
 Výstup: `List<Chunk>` `{ Index, Content, TokenCount }`.
 
-## Embeddings (Couch.Core/Embeddings — Azure OpenAI)
+## Embeddings (EnerkomChatbot.Core/Embeddings — Azure OpenAI)
 
-- Implementuje `IEmbeddingClient` z `Couch.Core/Abstractions` (wrapper nad `IEmbeddingGenerator` z Microsoft.Extensions.AI).
+- Implementuje `IEmbeddingClient` z `EnerkomChatbot.Core/Abstractions` (wrapper nad `IEmbeddingGenerator` z Microsoft.Extensions.AI).
 - Model: deployment `text-embedding-3-small` (konfigurovatelně, 1536 dim). Azure OpenAI embeddingy nemají „task type" jako Gemini — pro chunky i dotaz se volá stejně.
 - **Dávkování:** posílat chunky po dávkách (např. 100), respektovat TPM kvótu deploymentu.
 - **Resilience:** HTTP 429 (TPM) / 5xx → retry s exponenciálním backoffem (Microsoft.Extensions.Http.Resilience). Po vyčerpání pokusů → běh selže s jasným logem (raději spadnout než uložit nekonzistentní index).

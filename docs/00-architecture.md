@@ -4,9 +4,9 @@
 
 Systém má **tři běhové části** + sdílenou knihovnu:
 
-1. **`Couch.Core`** (knihovna) — sdílené modely, rozhraní, RAG služby (chunking, embeddings klient, retrieval). Sdílí Indexer i API.
-2. **`Couch.Indexer`** (konzolová / worker app) — dávkový proces: stáhne zdroje, zpracuje, naplní/aktualizuje vektorovou DB. Spouští se plánovaně.
-3. **`Couch.Api`** (ASP.NET Core) — online proces: přijímá dotazy z widgetu, dělá retrieval + volá LLM, vrací odpověď s citacemi.
+1. **`EnerkomChatbot.Core`** (knihovna) — sdílené modely, rozhraní, RAG služby (chunking, embeddings klient, retrieval). Sdílí Indexer i API.
+2. **`EnerkomChatbot.Indexer`** (konzolová / worker app) — dávkový proces: stáhne zdroje, zpracuje, naplní/aktualizuje vektorovou DB. Spouští se plánovaně.
+3. **`EnerkomChatbot.Api`** (ASP.NET Core) — online proces: přijímá dotazy z widgetu, dělá retrieval + volá LLM, vrací odpověď s citacemi.
 4. **Widget** (`web/widget`, TypeScript) — frontend vložený na web neziskovky.
 
 Společná databáze: **PostgreSQL + pgvector** (stávající cloud instance).
@@ -43,7 +43,7 @@ Společná databáze: **PostgreSQL + pgvector** (stávající cloud instance).
 ## Tok dat — dotaz (online)
 
 ```
-widget                Couch.Api                         Postgres    Azure OpenAI
+widget                EnerkomChatbot.Api                         Postgres    Azure OpenAI
   │   POST /api/chat      │                                 │              │
   │ ─────────────────────►│                                 │              │
   │  {question, history}  │  1) embedding(question) ───────────────────────►│
@@ -60,10 +60,10 @@ widget                Couch.Api                         Postgres    Azure OpenAI
 
 ## Hranice a zodpovědnosti
 
-- **Indexer nezná HTTP** — je to čistě dávkový proces nad `Couch.Core`.
+- **Indexer nezná HTTP** — je to čistě dávkový proces nad `EnerkomChatbot.Core`.
 - **API needělá crawl** — jen čte z DB a volá LLM. Indexaci nikdy nespouští synchronně v request handleru.
-- **Embeddings klient je v `Couch.Core`** — sdílí ho oba (indexer i API musí používat stejný model a rozměr vektoru, jinak retrieval nefunguje).
-- **Widget nezná API klíče** — veškerá komunikace s Azure OpenAI jde přes `Couch.Api`. Klíč nikdy neopouští backend.
+- **Embeddings klient je v `EnerkomChatbot.Core`** — sdílí ho oba (indexer i API musí používat stejný model a rozměr vektoru, jinak retrieval nefunguje).
+- **Widget nezná API klíče** — veškerá komunikace s Azure OpenAI jde přes `EnerkomChatbot.Api`. Klíč nikdy neopouští backend.
 
 ## Nefunkční požadavky
 
@@ -79,12 +79,12 @@ widget                Couch.Api                         Postgres    Azure OpenAI
 [ Web neziskovky ] ── <script> ──► [ widget.js (CDN/static) ]
                                           │ fetch /api/chat
                                           ▼
-                              [ Couch.Api (cloud, malá instance) ]
+                              [ EnerkomChatbot.Api (cloud, malá instance) ]
                                     │              │
                               SQL   │              │ HTTPS (API key)
                                     ▼              ▼
                         [ PostgreSQL+pgvector ]  [ Azure OpenAI ]
                                     ▲
                               UPSERT │
-                        [ Couch.Indexer ] ◄── plánovač (1×/den)
+                        [ EnerkomChatbot.Indexer ] ◄── plánovač (1×/den)
 ```

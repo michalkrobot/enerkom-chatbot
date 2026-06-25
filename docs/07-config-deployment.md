@@ -60,10 +60,10 @@ Azure OpenAI resource + deploye modelů vytvoří `deploy/setup.ps1` (viz [09-az
 
 | Komponenta | Kde běží | Pozn. |
 |---|---|---|
-| `Couch.Api` | **Azure** — App Service (B1/free) nebo Container App (scale-to-zero) | |
-| `widget.js` | statika — `wwwroot` v `Couch.Api` (jeden host, řeší CORS+původ), nebo Azure Blob static | |
+| `EnerkomChatbot.Api` | **Azure** — App Service (B1/free) nebo Container App (scale-to-zero) | |
+| `widget.js` | statika — `wwwroot` v `EnerkomChatbot.Api` (jeden host, řeší CORS+původ), nebo Azure Blob static | |
 | Postgres + pgvector | **stávající** cloud DB | 0 navíc |
-| `Couch.Indexer` | **Azure Container Apps Job** / WebJob / Function timer (cron) | běží jen při indexaci |
+| `EnerkomChatbot.Indexer` | **Azure Container Apps Job** / WebJob / Function timer (cron) | běží jen při indexaci |
 | Web (zdroj dat) | **Webnode** (cizí) | jen se z něj čte; vkládá se sem `<script>` widgetu |
 
 > Cloud Run / Container Apps se škálováním na nulu jsou pro nízký provoz nejlevnější — platí se jen za běh požadavku.
@@ -74,7 +74,7 @@ Azure OpenAI resource + deploye modelů vytvoří `deploy/setup.ps1` (viz [09-az
 - Env proměnné: `AzureOpenAI__Endpoint`, `AzureOpenAI__ApiKey`, `AzureOpenAI__ChatDeployment`, `AzureOpenAI__EmbeddingDeployment`, `Database__ConnectionString`, `Cors__AllowedOrigins__0`.
 - `/health` napojit na health probe hostingu.
 
-## Plán indexace (Couch.Indexer)
+## Plán indexace (EnerkomChatbot.Indexer)
 
 Indexer je krátkoběžný proces → spouštět **plánovačem**, ne pořád:
 
