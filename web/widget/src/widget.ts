@@ -24,6 +24,46 @@ import nunitoExt from "../assets/fonts/nunito-latinext.woff2?inline";
 
 type State = "idle" | "thinking" | "talking" | "happy" | "wave" | "confused";
 
+// Persisted across page navigations (multi-page host site reloads the widget on each page).
+// sessionStorage scope: survives same-tab navigation, clears when the tab closes — keeps the
+// conversation alive while browsing without long-term storage of (potentially personal) text.
+const STORE_KEY = "enerkom-chat-v1";
+
+type TurnKind = "user" | "bot" | "error";
+
+interface PersistedTurn {
+  kind: TurnKind;
+  text: string;
+  sources?: Source[];
+}
+
+interface PersistedState {
+  open: boolean;
+  greeted: boolean;
+  turns: PersistedTurn[];
+  history: Message[];
+}
+
+function loadState(): PersistedState | null {
+  try {
+    const raw = window.sessionStorage.getItem(STORE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as PersistedState;
+    if (!data || !Array.isArray(data.turns) || !Array.isArray(data.history)) return null;
+    return data;
+  } catch {
+    return null; // storage disabled (private mode) or corrupt — start fresh
+  }
+}
+
+function saveState(state: PersistedState): void {
+  try {
+    window.sessionStorage.setItem(STORE_KEY, JSON.stringify(state));
+  } catch {
+    // storage unavailable/full — degrade gracefully to per-page conversation
+  }
+}
+
 const GREETING = "Dobrý den, jsem Elektron. Zeptejte se mě na cokoli o naší organizaci ⚡";
 const NOT_FOUND =
   "To bohužel přesně nevím. Zkuste dotaz prosím přeformulovat, nebo nás kontaktujte.";
@@ -119,7 +159,9 @@ class ChatWidget {
   private sendBtn!: HTMLButtonElement;
 
   private readonly history: Message[] = [];
+  private readonly turns: PersistedTurn[] = [];
   private greeted = false;
+  private isOpen = false;
   private busy = false;
   private timers: number[] = [];
 
@@ -131,6 +173,37 @@ class ChatWidget {
     document.body.appendChild(this.host);
     loadFonts();
     this.render();
+    this.restore();
+  }
+
+  /** Rehydrate a conversation persisted by a previous page in this tab session. */
+  private restore(): void {
+    const saved = loadState();
+    if (!saved) return;
+    this.greeted = saved.greeted;
+    this.history.push(...saved.history);
+    for (const t of saved.turns) {
+      this.turns.push(t);
+      if (t.kind === "user") this.renderUser(t.text);
+      else if (t.kind === "bot") this.renderBot(t.text, t.sources);
+      else this.renderError(t.text);
+    }
+    if (saved.open) {
+      // Reopen without re-greeting or stealing focus on page load.
+      this.isOpen = true;
+      this.panel.classList.add("open");
+      this.launcher.hidden = true;
+    }
+    this.scrollToBottom();
+  }
+
+  private persist(): void {
+    saveState({
+      open: this.isOpen,
+      greeted: this.greeted,
+      turns: this.turns,
+      history: this.history,
+    });
   }
 
   private render(): void {
@@ -298,40 +371,54 @@ class ChatWidget {
 
   // ---- panel open/close ----
   private open(): void {
+    this.isOpen = true;
     this.panel.classList.add("open");
     this.launcher.hidden = true;
     this.input.focus();
     if (!this.greeted) {
       this.greeted = true;
-      this.addBotMessage(GREETING);
+      this.renderBot(GREETING);
+      this.turns.push({ kind: "bot", text: GREETING });
       this.clearTimers();
       this.setState("wave");
       this.settleToIdle(1800);
     }
+    this.persist();
   }
 
   private close(): void {
+    this.isOpen = false;
     this.panel.classList.remove("open");
     this.launcher.hidden = false;
     this.clearTimers();
     this.setState("idle");
     this.launcher.focus();
+    this.persist();
   }
 
   // ---- messages ----
-  private addUserMessage(text: string): void {
+  // render* build DOM only; persistence happens where a turn is recorded.
+  private renderUser(text: string): void {
     const m = el("div", "msg user");
     m.textContent = text;
     this.msgs.insertBefore(m, this.typing);
     this.scrollToBottom();
   }
 
-  private addBotMessage(text: string): HTMLDivElement {
+  private renderBot(text: string, sources?: Source[]): HTMLDivElement {
     const m = el("div", "msg bot");
     m.textContent = text;
     this.msgs.insertBefore(m, this.typing);
+    if (sources && sources.length > 0) this.renderSources(m, sources);
     this.scrollToBottom();
     return m;
+  }
+
+  private renderError(text: string): void {
+    const e = el("div", "msg error");
+    e.textContent = text;
+    this.msgs.insertBefore(e, this.typing);
+    this.scrollToBottom();
   }
 
   private renderSources(parent: HTMLDivElement, sources: Source[]): void {
@@ -370,8 +457,10 @@ class ChatWidget {
     this.sendBtn.disabled = true;
     this.input.value = "";
     this.clearTimers();
-    this.addUserMessage(question);
+    this.renderUser(question);
+    this.turns.push({ kind: "user", text: question });
     this.history.push({ role: "user", content: question });
+    this.persist();
     this.setState("thinking");
 
     let bubble: HTMLDivElement | null = null;
@@ -404,8 +493,14 @@ class ChatWidget {
         },
         onDone: (answered) => {
           const b = ensureBubble();
+          const finalText = answerText.length === 0 && !answered ? NOT_FOUND : answerText;
           if (answerText.length === 0 && !answered) b.textContent = NOT_FOUND;
           this.renderSources(b, sourcesBuffer);
+          this.turns.push({
+            kind: "bot",
+            text: finalText,
+            sources: sourcesBuffer.length > 0 ? [...sourcesBuffer] : undefined,
+          });
           if (answered) {
             this.history.push({ role: "assistant", content: answerText });
             if (GRATITUDE.test(question)) {
@@ -419,14 +514,14 @@ class ChatWidget {
             this.setState("confused");
             this.settleToIdle(1400);
           }
+          this.persist();
         },
       });
     } catch (err) {
       const message = err instanceof ChatApiError && err.message ? err.message : GENERIC_ERROR;
-      const e = el("div", "msg error");
-      e.textContent = message;
-      this.msgs.insertBefore(e, this.typing);
-      this.scrollToBottom();
+      this.renderError(message);
+      this.turns.push({ kind: "error", text: message });
+      this.persist();
       this.setState("confused");
       this.settleToIdle(1400);
     } finally {
