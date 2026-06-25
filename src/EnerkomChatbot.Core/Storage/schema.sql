@@ -1,8 +1,11 @@
 -- EnerkomChatbot — schéma databáze (PostgreSQL + pgvector)
 -- Idempotentní: spouští se na začátku každého indexačního běhu.
 -- Viz docs/02-database.md. Rozměr vektoru 1536 = Azure OpenAI text-embedding-3-small.
-
-CREATE EXTENSION IF NOT EXISTS vector;
+--
+-- Pozn.: `CREATE EXTENSION vector` ZDE NENÍ — na Azure Flexible Serveru ho smí spustit jen
+-- člen azure_pg_admin a aplikační role dostane 42501 i s IF NOT EXISTS (i když už existuje).
+-- Extension proto vytváří admin v deploy/db-setup.sql a DatabaseInitializer ji jen tolerantně
+-- ověří před spuštěním tohoto skriptu.
 
 -- Hlavní tabulka chunků
 CREATE TABLE IF NOT EXISTS documents (
