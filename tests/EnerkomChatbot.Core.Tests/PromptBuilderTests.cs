@@ -8,8 +8,8 @@ namespace EnerkomChatbot.Core.Tests;
 
 public sealed class PromptBuilderTests
 {
-    private static PromptBuilder CreateBuilder(string name = "Enerkom HP", string contact = "info@enerkomhp.cz") =>
-        new(Microsoft.Extensions.Options.Options.Create(new OrgOptions { Name = name, Contact = contact }));
+    private static PromptBuilder CreateBuilder(string name = "Enerkom HP", string contactUrl = "https://www.enerkomhp.cz/kontakt/") =>
+        new(Microsoft.Extensions.Options.Options.Create(new OrgOptions { Name = name, ContactUrl = contactUrl }));
 
     private static SearchResult Hit(
         string type = "web",
@@ -121,7 +121,7 @@ public sealed class PromptBuilderTests
     public void BuildSystemPrompt_SubstitutesOrgNameContactAndContext()
     {
         // Arrange
-        var builder = CreateBuilder(name: "Moje Nezisková", contact: "kontakt@example.org");
+        var builder = CreateBuilder(name: "Moje Nezisková", contactUrl: "https://example.org/kontakt");
         IReadOnlyList<SearchResult> hits = [Hit(content: "Důležitý fakt o energii.")];
 
         // Act
@@ -129,12 +129,12 @@ public sealed class PromptBuilderTests
 
         // Assert
         Assert.Contains("Moje Nezisková", prompt, StringComparison.Ordinal);
-        Assert.Contains("kontakt@example.org", prompt, StringComparison.Ordinal);
+        Assert.Contains("https://example.org/kontakt", prompt, StringComparison.Ordinal);
         Assert.Contains("[1]", prompt, StringComparison.Ordinal);
         Assert.Contains("Důležitý fakt o energii.", prompt, StringComparison.Ordinal);
         // No unfilled placeholders remain.
         Assert.DoesNotContain("{ORG_NAME}", prompt, StringComparison.Ordinal);
-        Assert.DoesNotContain("{CONTACT}", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("{CONTACT_URL}", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("{CONTEXT}", prompt, StringComparison.Ordinal);
     }
 
@@ -152,14 +152,14 @@ public sealed class PromptBuilderTests
     public void BuildSystemPrompt_NoHits_StillSubstitutesOrgAndUsesEmptyContext()
     {
         // Arrange
-        var builder = CreateBuilder(name: "Moje Nezisková", contact: "kontakt@example.org");
+        var builder = CreateBuilder(name: "Moje Nezisková", contactUrl: "https://example.org/kontakt");
 
         // Act
         var prompt = builder.BuildSystemPrompt([]);
 
         // Assert
         Assert.Contains("Moje Nezisková", prompt, StringComparison.Ordinal);
-        Assert.Contains("kontakt@example.org", prompt, StringComparison.Ordinal);
+        Assert.Contains("https://example.org/kontakt", prompt, StringComparison.Ordinal);
         Assert.Contains(PromptBuilder.EmptyContext, prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("{CONTEXT}", prompt, StringComparison.Ordinal);
     }

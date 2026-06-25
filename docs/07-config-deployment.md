@@ -39,7 +39,7 @@ Sdílené sekce v `appsettings.json` (API) a `appsettings.json`/env (Indexer). *
   },
   "Org": {
     "Name": "Enerkom HP",
-    "Contact": "info@enerkomhp.cz, +420 …"
+    "ContactUrl": "https://www.enerkomhp.cz/kontakt/"
   }
 }
 ```
