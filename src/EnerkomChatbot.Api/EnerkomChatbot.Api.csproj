@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>EnerkomChatbot.Api</RootNamespace>
+    <AssemblyName>EnerkomChatbot.Api</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EnerkomChatbot.Core\EnerkomChatbot.Core.csproj" />
+  </ItemGroup>
+
+</Project>

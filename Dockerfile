@@ -1,11 +1,11 @@
-# Dockerfile — Couch.Api (chatbot backend + widget)
+# Dockerfile — EnerkomChatbot.Api (chatbot backend + widget)
 #
 # PŘEDPOKLADY (viz docs/01-project-structure.md, docs/09-azure-deploy.md):
-#   - src/Couch.Api/Couch.Api.csproj (referencuje Couch.Core)
-#   - src/Couch.Core/
+#   - src/EnerkomChatbot.Api/EnerkomChatbot.Api.csproj (referencuje EnerkomChatbot.Core)
+#   - src/EnerkomChatbot.Core/
 #   - web/widget/ s package.json + vite (npm run build → web/widget/dist/widget.js)
-#   - Couch.Api servíruje statiku z wwwroot (UseStaticFiles / MapStaticAssets)
-#   - Couch.Api naslouchá na :8080 a má GET /health
+#   - EnerkomChatbot.Api servíruje statiku z wwwroot (UseStaticFiles / MapStaticAssets)
+#   - EnerkomChatbot.Api naslouchá na :8080 a má GET /health
 # Build context = kořen repozitáře.
 
 # ---- Stage 1: build widgetu (Vite → IIFE bundle widget.js) ----
@@ -20,11 +20,11 @@ RUN npm run build
 # ---- Stage 2: build & publish .NET API ----
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
-COPY Couch.slnx Directory.Build.props Directory.Packages.props ./
-COPY src/Couch.Core/ src/Couch.Core/
-COPY src/Couch.Api/ src/Couch.Api/
-RUN dotnet restore src/Couch.Api/Couch.Api.csproj
-RUN dotnet publish src/Couch.Api/Couch.Api.csproj -c Release -o /app/publish --no-restore
+COPY EnerkomChatbot.slnx Directory.Build.props Directory.Packages.props NuGet.config ./
+COPY src/EnerkomChatbot.Core/ src/EnerkomChatbot.Core/
+COPY src/EnerkomChatbot.Api/ src/EnerkomChatbot.Api/
+RUN dotnet restore src/EnerkomChatbot.Api/EnerkomChatbot.Api.csproj
+RUN dotnet publish src/EnerkomChatbot.Api/EnerkomChatbot.Api.csproj -c Release -o /app/publish --no-restore
 
 # ---- Stage 3: runtime ----
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
@@ -37,4 +37,4 @@ ENV ASPNETCORE_URLS=http://+:8080
 ENV PORT=8080
 EXPOSE 8080
 
-ENTRYPOINT ["dotnet", "Couch.Api.dll"]
+ENTRYPOINT ["dotnet", "EnerkomChatbot.Api.dll"]

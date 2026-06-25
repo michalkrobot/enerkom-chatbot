@@ -1,4 +1,4 @@
-# 04 — Chat API (Couch.Api)
+# 04 — Chat API (EnerkomChatbot.Api)
 
 ASP.NET Core Minimal API. Online proces: přijme dotaz, udělá retrieval, zavolá LLM, vrátí odpověď s citacemi.
 
@@ -49,7 +49,7 @@ event: done         data: {"answered":true}
 
 Liveness + readiness (ověří připojení k DB). Pro monitoring/hosting.
 
-## RAG pipeline (ChatService v Couch.Core/Rag)
+## RAG pipeline (ChatService v EnerkomChatbot.Core/Rag)
 
 ```
 1. Validace: question 1..2000 znaků; ořež history na posledních ~6 zpráv.

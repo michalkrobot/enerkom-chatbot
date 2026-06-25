@@ -7,7 +7,7 @@ stejně jako varianta_1.html.
 """
 import re, json, gzip, base64, pathlib
 
-ROOT = pathlib.Path(__file__).resolve().parents[3]      # D:\spc\couch
+ROOT = pathlib.Path(__file__).resolve().parents[3]      # repo root
 HERE = pathlib.Path(__file__).resolve().parent          # .../varianty
 BUNDLE = ROOT / "elektron-navrh.html"
 TEMPLATE = HERE / "varianta_2.template.html"

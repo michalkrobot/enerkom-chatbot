@@ -90,4 +90,4 @@ Tím se šetří volání embeddings API (největší položka rate limitu) — 
 
 ## Migrace
 
-Stačí jednoduchý SQL skript spouštěný při startu indexeru (idempotentní `CREATE ... IF NOT EXISTS`). EF Core není nutné — přístup k DB je přes čistý Npgsql (rychlé, bez ORM overheadu). Skript ulož do `src/Couch.Core/Storage/schema.sql` a spouštěj ho na začátku indexačního běhu.
+Stačí jednoduchý SQL skript spouštěný při startu indexeru (idempotentní `CREATE ... IF NOT EXISTS`). EF Core není nutné — přístup k DB je přes čistý Npgsql (rychlé, bez ORM overheadu). Skript ulož do `src/EnerkomChatbot.Core/Storage/schema.sql` a spouštěj ho na začátku indexačního běhu.

@@ -1,6 +1,6 @@
 # 09 — Nasazení do Azure (plán pro agenta)
 
-Plán pro nasazení chatbota **Couch** do **stávajícího** Azure předplatného Enerkom HP, vedle aplikace EDC, s minimálními náklady navíc. Plán je psaný tak, aby ho mohl odkrokovat agent. Navazuje na [07-config-deployment.md](07-config-deployment.md) a tvoří konkrétní obsah **Fáze 5** z [08-implementation-plan.md](08-implementation-plan.md).
+Plán pro nasazení chatbota **EnerkomChatbot** do **stávajícího** Azure předplatného Enerkom HP, vedle aplikace EDC, s minimálními náklady navíc. Plán je psaný tak, aby ho mohl odkrokovat agent. Navazuje na [07-config-deployment.md](07-config-deployment.md) a tvoří konkrétní obsah **Fáze 5** z [08-implementation-plan.md](08-implementation-plan.md).
 
 ---
 
@@ -53,13 +53,13 @@ Sdílí se: subscription, resource group, Container Apps Environment, Postgres *
 
 ## 2. Předpoklady (musí platit PŘED deployem)
 
-1. **Aplikace je implementovaná** — fáze 0–4 z [08-implementation-plan.md](08-implementation-plan.md). Aktuálně v repu existují jen docs + `web/widget` + `data/knowledge-base`; `src/` a `.slnx` zatím **nejsou**. Bez běžícího `Couch.Api` není co nasazovat.
-2. **`couch` je git repozitář s remote na GitHubu** (dnes není git repo). Potřeba pro Actions + ghcr.io.
-3. **`Dockerfile`** pro `Couch.Api`, který servíruje i `widget.js` ze `wwwroot` (vzor: EDC `Dockerfile`, multistage SDK 10 → aspnet 10; pro chatbota BEZ Playwright závislostí — ty EDC potřeboval na scraping, chatbot ne).
+1. **Aplikace je implementovaná** — fáze 0–4 z [08-implementation-plan.md](08-implementation-plan.md). Aktuálně v repu existují jen docs + `web/widget` + `data/knowledge-base`; `src/` a `.slnx` zatím **nejsou**. Bez běžícího `EnerkomChatbot.Api` není co nasazovat.
+2. **`enerkom-chatbot` je git repozitář s remote na GitHubu** (dnes není git repo). Potřeba pro Actions + ghcr.io.
+3. **`Dockerfile`** pro `EnerkomChatbot.Api`, který servíruje i `widget.js` ze `wwwroot` (vzor: EDC `Dockerfile`, multistage SDK 10 → aspnet 10; pro chatbota BEZ Playwright závislostí — ty EDC potřeboval na scraping, chatbot ne).
 4. **Lokálně přihlášené `az` CLI** do správného předplatného (`az account show` → `594e58df-…`).
 5. **Azure OpenAI** — resource + deploye modelů vytvoří `setup.ps1` (krok 2b). Ověřit jen dostupnost modelů v regionu (`az cognitiveservices account list-models`).
 
-> Jeden krátký Dockerfile pro indexer (`Couch.Indexer`) je také potřeba (krok 7) — může to být stejný image se dvěma entrypointy nebo dva samostatné images.
+> Jeden krátký Dockerfile pro indexer (`EnerkomChatbot.Indexer`) je také potřeba (krok 7) — může to být stejný image se dvěma entrypointy nebo dva samostatné images.
 
 ---
 
@@ -245,7 +245,7 @@ az containerapp job create `
     "Indexer__DocumentsPath=/app/data/knowledge-base"
 ```
 
-- Image indexeru = entrypoint `Couch.Indexer` (samostatný Dockerfile, nebo stejný image s jiným ENTRYPOINT/argumentem).
+- Image indexeru = entrypoint `EnerkomChatbot.Indexer` (samostatný Dockerfile, nebo stejný image s jiným ENTRYPOINT/argumentem).
 - Dokumenty z `data/knowledge-base` musí být v image (COPY) nebo na připojeném úložišti.
 - Po doběhu zápis do `indexing_runs` (monitoring). Ruční spuštění prvního běhu: `az containerapp job start -n $JobName -g $Rg`.
 

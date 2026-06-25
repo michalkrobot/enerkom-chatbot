@@ -1,6 +1,15 @@
 # Local data / large binaries (not versioned)
 local-data/
 
+# .NET build output
+[Bb]in/
+[Oo]bj/
+*.user
+artifacts/
+
+# Deploy secrets (drž jen secrets.env.example)
+deploy/secrets.env
+
 # Python
 __pycache__/
 *.py[cod]

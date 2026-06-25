@@ -1,4 +1,4 @@
-# TODO — Couch (chatbot) → nasazení do Azure
+# TODO — EnerkomChatbot (chatbot) → nasazení do Azure
 
 Cíl: nasadit chatbota vedle EDC do **stávajícího** předplatného (sdílené `rg-edc` + `edc-env` + Postgres `edc-postgres-gtsmjb`), doména `chatbot.enerkom-hp.cz`, náklady ~0 navíc.
 Detailní plán: [docs/09-azure-deploy.md](docs/09-azure-deploy.md) · Artefakty: `Dockerfile`, `Dockerfile.indexer`, `deploy/`, `.github/workflows/deploy-azure.yml`.
@@ -9,7 +9,7 @@ Detailní plán: [docs/09-azure-deploy.md](docs/09-azure-deploy.md) · Artefakty
 
 Pořadí dle [docs/08-implementation-plan.md](docs/08-implementation-plan.md):
 
-- [ ] **T0.1** Skeleton: `Couch.slnx`, `Directory.Build.props`, `Directory.Packages.props`, `.editorconfig`, projekty `Couch.Core` / `Couch.Indexer` / `Couch.Api` (+ testy). TFM `net10.0`.
+- [ ] **T0.1** Skeleton: `EnerkomChatbot.slnx`, `Directory.Build.props`, `Directory.Packages.props`, `.editorconfig`, projekty `EnerkomChatbot.Core` / `EnerkomChatbot.Indexer` / `EnerkomChatbot.Api` (+ testy). TFM `net10.0`.
 - [ ] **T1.x** Databáze a Core: `schema.sql` (`vector(1536)`), modely + abstrakce, `PgVectorStore`, `Chunker`, Azure OpenAI klienti (přes `Azure.AI.OpenAI` + `Microsoft.Extensions.AI.OpenAI`).
 - [ ] **T2.x** Indexer: DocumentLoader (PDF/DOCX/MD), WebCrawler, IndexingPipeline + `Program.cs`.
 - [ ] **T3.x** Chat API: ChatService + PromptBuilder, endpointy (`POST /api/chat`, `GET /health`), CORS, rate limit.
@@ -29,7 +29,7 @@ Pořadí dle [docs/08-implementation-plan.md](docs/08-implementation-plan.md):
 
 ## B. Repo a CI/CD příprava
 
-- [ ] `git init` v `D:\spc\couch` + remote na GitHub, push.
+- [ ] `git init` v `d:eposkromenerkom-chatbot` + remote na GitHub, push.
 - [ ] Service principal → secret `AZURE_CREDENTIALS`:
       `az ad sp create-for-rbac --name chatbot-deploy --role contributor --scopes /subscriptions/594e58df-c16e-47e0-9dd9-c404efd67701/resourceGroups/rg-edc --sdk-auth`
 - [ ] (Jen privátní repo) ghcr.io credentials pro Container App: `az containerapp registry set --server ghcr.io ...`.
