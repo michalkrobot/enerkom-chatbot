@@ -1,0 +1,80 @@
+name: Deploy chatbot to Azure Container Apps
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  RESOURCE_GROUP: rg-edc
+  CONTAINERAPP_NAME: chatbot-api
+  INDEXER_JOB_NAME: chatbot-indexer
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # POZN.: ghcr.io vyžaduje malá písmena v názvu image. Pokud owner/repo
+      # obsahuje velká písmena, nahraď ${{ github.repository }} ručně malými písmeny.
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}-api:latest
+            ghcr.io/${{ github.repository }}-api:${{ github.sha }}
+          provenance: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Indexer image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.indexer
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}-indexer:latest
+            ghcr.io/${{ github.repository }}-indexer:${{ github.sha }}
+          provenance: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy API to Container Apps
+        run: |
+          az containerapp update \
+            --name "$CONTAINERAPP_NAME" \
+            --resource-group "$RESOURCE_GROUP" \
+            --image "ghcr.io/${{ github.repository }}-api:${{ github.sha }}" \
+            --revision-suffix "sha-${GITHUB_SHA::7}"
+
+      - name: Deploy Indexer job image
+        run: |
+          az containerapp job update \
+            --name "$INDEXER_JOB_NAME" \
+            --resource-group "$RESOURCE_GROUP" \
+            --image "ghcr.io/${{ github.repository }}-indexer:${{ github.sha }}"

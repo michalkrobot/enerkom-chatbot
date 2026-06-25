@@ -1,0 +1,34 @@
+# Git / CI / nástroje
+.git
+.github
+.claude
+.gitignore
+
+# .NET build artefakty
+**/bin/
+**/obj/
+
+# Node
+**/node_modules/
+web/widget/dist/
+
+# Dokumentace a velké zdrojové assety (do image nepatří)
+docs/
+*.md
+*.pdf
+*.svg
+*.afdesign
+*.mp4
+*.zip
+*.log
+mascot-frames/
+Design_manual.*
+Elektron.mp4
+
+# POZN.: data/knowledge-base/ se ZÁMĚRNĚ NEignoruje — potřebuje ho Dockerfile.indexer.
+# Vzorec "*.md" výše platí jen pro kořen repozitáře, takže .md dokumenty
+# v data/knowledge-base/ zůstávají v build kontextu.
+
+# Lokální secrets
+deploy/secrets.env
+**/.env

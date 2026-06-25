@@ -1,0 +1,27 @@
+# Local data / large binaries (not versioned)
+local-data/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Node / web tooling
+node_modules/
+dist/
+build/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Env / secrets
+.env
+.env.*
+*.local

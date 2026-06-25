@@ -1,0 +1,26 @@
+# Dockerfile.indexer — Couch.Indexer (dávkový indexer, běží jako Container Apps Job)
+#
+# PŘEDPOKLADY (viz docs/03-indexer.md, docs/09-azure-deploy.md):
+#   - src/Couch.Indexer/Couch.Indexer.csproj (referencuje Couch.Core)
+#   - data/knowledge-base/ obsahuje dokumenty k indexaci (PDF/DOCX/MD)
+#   - Indexer čte konfiguraci z env (Database__ConnectionString, Gemini__ApiKey, Indexer__*)
+#   - schema.sql se spouští na startu běhu (idempotentní)
+# Build context = kořen repozitáře.
+
+# ---- Stage 1: build & publish ----
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY Couch.slnx Directory.Build.props Directory.Packages.props ./
+COPY src/Couch.Core/ src/Couch.Core/
+COPY src/Couch.Indexer/ src/Couch.Indexer/
+RUN dotnet restore src/Couch.Indexer/Couch.Indexer.csproj
+RUN dotnet publish src/Couch.Indexer/Couch.Indexer.csproj -c Release -o /app/publish --no-restore
+
+# ---- Stage 2: runtime (console worker → stačí runtime, ne aspnet) ----
+FROM mcr.microsoft.com/dotnet/runtime:10.0 AS runtime
+WORKDIR /app
+COPY --from=build /app/publish ./
+# Dokumenty pro indexaci do image (alternativa: namountovat úložiště)
+COPY data/knowledge-base/ ./data/knowledge-base/
+
+ENTRYPOINT ["dotnet", "Couch.Indexer.dll"]

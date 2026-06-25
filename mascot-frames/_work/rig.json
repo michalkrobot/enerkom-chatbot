@@ -1,0 +1,54 @@
+{
+ "W": 653,
+ "H": 1447,
+ "eyes": [
+  [
+   164,
+   576,
+   247,
+   647
+  ],
+  [
+   408,
+   568,
+   491,
+   639
+  ]
+ ],
+ "skin": [
+  247,
+  207,
+  182
+ ],
+ "lids": [
+  {
+   "name": "l",
+   "file": "web/widget/assets/eyelid-l.png",
+   "x": 143,
+   "y": 555,
+   "w": 125,
+   "h": 101
+  },
+  {
+   "name": "r",
+   "file": "web/widget/assets/eyelid-r.png",
+   "x": 387,
+   "y": 547,
+   "w": 125,
+   "h": 101
+  }
+ ],
+ "mouth_lid": {
+  "file": "web/widget/assets/mouth-closed.png",
+  "x": 256,
+  "y": 721,
+  "w": 151,
+  "h": 105
+ },
+ "head": [
+  0,
+  0,
+  653,
+  881
+ ]
+}

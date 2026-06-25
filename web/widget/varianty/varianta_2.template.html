@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elektron — chat widget · varianta 2</title>
+<style>
+  /* ===== inline fonts (latin + latin-ext kvůli češtině) ===== */
+  @font-face{ font-family:'Baloo 2'; font-style:normal; font-weight:500 800;
+    font-display:swap; src:url("__BALOO_LATINEXT__") format('woff2');
+    unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+  @font-face{ font-family:'Baloo 2'; font-style:normal; font-weight:500 800;
+    font-display:swap; src:url("__BALOO_LATIN__") format('woff2');
+    unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+  @font-face{ font-family:'Nunito'; font-style:normal; font-weight:400 800;
+    font-display:swap; src:url("__NUNITO_LATINEXT__") format('woff2');
+    unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+  @font-face{ font-family:'Nunito'; font-style:normal; font-weight:400 800;
+    font-display:swap; src:url("__NUNITO_LATIN__") format('woff2');
+    unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+
+  *{ box-sizing:border-box; }
+  body{ margin:0; min-height:100vh; font-family:'Nunito',system-ui,sans-serif;
+    background:radial-gradient(circle at 50% -10%,#f0faf0 0%,#ddf0df 55%,#cbe6cf 100%); color:#234; }
+  .page{ max-width:760px; margin:0 auto; padding:40px 20px 120px; }
+  .page h1{ font-family:'Baloo 2',cursive; color:#1f6b3a; margin:0 0 6px; }
+  .page p{ color:#456; line-height:1.5; }
+  .hint{ background:#fff; border:1px solid #e2efe9; border-radius:14px; padding:14px 18px;
+    box-shadow:0 6px 20px rgba(31,107,58,.08); }
+  .hint b{ color:#1f6b3a; }
+
+  /* ===== animace maskota ===== */
+  @keyframes breathe{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-5px) scale(1.012)}}
+  @keyframes thinkTilt{0%,100%{transform:rotate(-5deg) translateY(0)}50%{transform:rotate(2.5deg) translateY(-2px)}}
+  @keyframes talkBob{0%,100%{transform:translateY(0) scaleY(1)}50%{transform:translateY(3px) scaleY(.985)}}
+  @keyframes happyBounce{0%,100%{transform:translateY(0) scale(1,1)}18%{transform:translateY(-24px) scale(.97,1.06)}42%{transform:translateY(0) scale(1.07,.93)}62%{transform:translateY(-9px) scale(1,1)}}
+  @keyframes waveGreet{0%,100%{transform:rotate(0deg)}20%{transform:rotate(7deg)}45%{transform:rotate(-5deg)}70%{transform:rotate(6deg)}}
+  @keyframes confusedWobble{0%,100%{transform:rotate(-3.5deg) translateY(0)}50%{transform:rotate(6deg) translateY(-3px)}}
+  @keyframes blink{0%,90%,96.5%,100%{transform:scaleY(0)}93.3%{transform:scaleY(1)}}
+  @keyframes dotJump{0%,72%,100%{transform:translateY(0);opacity:.45}36%{transform:translateY(-7px);opacity:1}}
+  @keyframes confettiFall{0%{transform:translateY(-12px) rotate(0);opacity:0}12%{opacity:1}100%{transform:translateY(330px) rotate(420deg);opacity:0}}
+  @keyframes pulseDot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.6);opacity:.55}}
+  @keyframes popIn{0%{transform:scale(.7) translateY(14px);opacity:0}100%{transform:scale(1) translateY(0);opacity:1}}
+
+  /* ===== launcher (sbalený widget) ===== */
+  .ek-launch{ position:fixed; right:24px; bottom:24px; z-index:9999; display:flex;
+    align-items:center; gap:11px; padding:8px 18px 8px 8px; border:0; cursor:pointer;
+    background:linear-gradient(160deg,#41a85d,#2e8b4f); color:#fff; border-radius:999px;
+    font-family:'Baloo 2',cursive; font-weight:800; font-size:15px;
+    box-shadow:0 12px 30px -6px rgba(31,107,58,.55); transition:transform .15s, box-shadow .15s; }
+  .ek-launch:hover{ transform:translateY(-2px); box-shadow:0 16px 36px -6px rgba(31,107,58,.6); }
+  .ek-launch .av{ position:relative; width:46px; height:46px; border-radius:50%; flex:none; overflow:hidden;
+    background:#eaf6ec; box-shadow:inset 0 0 0 2px rgba(255,255,255,.6); }
+  /* maskot je full-figure (velkohlavý); hlava sahá od ~6 % do ~67 % výšky (střed ~37 %)
+     a je vyšší než širší → škálujeme na výšku, ať je vidět celá (vlasy i brada) */
+  .ek-launch .av img{ position:absolute; left:50%; top:0; width:70%; height:auto;
+    transform:translate(-50%,-3%); display:block; }
+  .ek-launch.hidden{ display:none; }
+
+  /* ===== panel ===== */
+  .ek-panel{ position:fixed; right:24px; bottom:24px; z-index:10000;
+    width:580px; max-width:calc(100vw - 32px); height:520px; max-height:calc(100vh - 48px);
+    display:none; background:#fff; border-radius:24px; overflow:hidden;
+    box-shadow:0 28px 64px -22px rgba(31,107,58,.5),0 6px 18px rgba(31,107,58,.14);
+    transform-origin:bottom right; }
+  .ek-panel.open{ display:flex; animation:popIn .26s cubic-bezier(.2,.9,.3,1.2); }
+
+  /* ===== mascot stage (vlevo) ===== */
+  .ek-stage{ position:relative; width:212px; flex:none; overflow:hidden;
+    background:linear-gradient(165deg,#41a85d 0%,#2e8b4f 55%,#22703e 100%);
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-end; }
+  .ek-stage .blob{ position:absolute; border-radius:50%; background:rgba(255,255,255,.07); }
+  .ek-stage .blob.a{ top:-40px; left:-40px; width:140px; height:140px; }
+  .ek-stage .blob.b{ bottom:-30px; right:-30px; width:120px; height:120px; background:rgba(255,255,255,.06); }
+  .ek-pill{ position:absolute; top:16px; left:0; right:0; display:flex; justify-content:center; z-index:7; }
+  .ek-pill > div{ display:flex; align-items:center; gap:7px; background:rgba(255,255,255,.2); color:#fff;
+    font-weight:800; font-size:12px; padding:6px 13px; border-radius:999px; }
+  .ek-pill .dot{ width:8px; height:8px; border-radius:50%; background:#c6f7cd;
+    animation:pulseDot 1.8s ease-in-out infinite; }
+
+  .ek-confetti{ position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:8; display:none; }
+  .ek-stage.s-happy .ek-confetti{ display:block; }
+
+  .ek-mascot{ position:relative; width:132px; aspect-ratio:330/710; margin-top:26px; }
+  .ek-bubble{ position:absolute; z-index:6; display:none; }
+  .ek-stage.s-thinking .ek-bubble.think{ display:block; }
+  .ek-stage.s-wave     .ek-bubble.wave{ display:block; }
+  .ek-stage.s-confused .ek-bubble.conf{ display:block; }
+  .ek-bubble.think{ top:26px; left:96px; }
+  .ek-bubble.think .box{ display:flex; gap:5px; background:#fff; padding:10px 13px; border-radius:16px;
+    box-shadow:0 8px 18px rgba(0,0,0,.2); }
+  .ek-bubble.think .tail{ width:9px; height:9px; border-radius:50%; background:#fff; margin:3px 0 0 4px; }
+  .ek-bubble.think span{ width:7px; height:7px; border-radius:50%; background:#7a8f80;
+    animation:dotJump 1.1s ease-in-out infinite; }
+  .ek-bubble.think span:nth-child(2){ animation-delay:.18s }
+  .ek-bubble.think span:nth-child(3){ animation-delay:.36s }
+  .ek-bubble.wave{ top:20px; left:92px; }
+  .ek-bubble.wave .box{ position:relative; background:#fff; color:#1f6b3a; font-family:'Baloo 2',cursive;
+    font-weight:800; font-size:15px; padding:8px 14px; border-radius:16px; box-shadow:0 8px 18px rgba(0,0,0,.2);
+    white-space:nowrap; }
+  .ek-bubble.conf{ top:14px; left:98px; }
+  .ek-bubble.conf .box{ position:relative; background:#fff; color:#e0a000; font-family:'Baloo 2',cursive;
+    font-weight:800; font-size:22px; line-height:1; padding:6px 13px; border-radius:16px;
+    box-shadow:0 8px 18px rgba(0,0,0,.2); }
+  .ek-bubble .nib{ position:absolute; bottom:7px; left:-5px; width:12px; height:12px; background:#fff;
+    transform:rotate(45deg); border-radius:2px; }
+
+  .ek-shadow{ position:absolute; bottom:2px; left:50%; transform:translateX(-50%);
+    width:112px; height:18px; background:rgba(0,0,0,.2); filter:blur(7px); border-radius:50%; z-index:0; }
+  .ek-body3d{ position:absolute; inset:0; transform-origin:50% 100%; z-index:1;
+    animation:breathe 4s ease-in-out infinite; }
+  .ek-stage.s-thinking .ek-body3d{ animation:thinkTilt 2.6s ease-in-out infinite; }
+  .ek-stage.s-talking  .ek-body3d{ animation:talkBob .42s ease-in-out infinite; }
+  .ek-stage.s-happy    .ek-body3d{ animation:happyBounce .9s ease-in-out infinite; }
+  .ek-stage.s-wave     .ek-body3d{ animation:waveGreet 1.1s ease-in-out infinite; }
+  .ek-stage.s-confused .ek-body3d{ animation:confusedWobble 2.2s ease-in-out infinite; }
+  .ek-body3d img{ width:100%; height:100%; object-fit:contain; object-position:bottom; display:block; }
+  .ek-eye{ position:absolute; width:16.6%; height:6.6%; background:#f7cfb6; border-radius:50%;
+    transform-origin:top center; transform:scaleY(0); box-shadow:inset 0 -3px 4px rgba(150,90,60,.28);
+    animation:blink 4.3s infinite; }
+  .ek-eye.l{ left:26.1%; top:45.4%; } .ek-eye.r{ left:63.4%; top:44.9%; }
+
+  /* ===== chat (vpravo) ===== */
+  .ek-chat{ flex:1; display:flex; flex-direction:column; min-width:0; }
+  .ek-head{ display:flex; align-items:center; gap:11px; padding:14px 16px; border-bottom:1px solid #eef2ee; }
+  .ek-head .logo{ width:38px; height:38px; border-radius:11px; flex:none; display:flex;
+    align-items:center; justify-content:center; background:linear-gradient(160deg,#41a85d,#2e8b4f); }
+  .ek-head .logo span{ color:#ffd95e; font-size:20px; line-height:1; }
+  .ek-head .meta{ min-width:0; flex:1; }
+  .ek-head .meta b{ font-family:'Baloo 2',cursive; font-weight:800; color:#1f6b3a; font-size:16px; }
+  .ek-head .meta small{ display:block; font-size:12px; color:#7aa384; font-weight:700; }
+  .ek-head .x{ background:transparent; border:0; color:#9fb6a6; font-size:24px; line-height:1;
+    cursor:pointer; padding:0 4px; } .ek-head .x:hover{ color:#5f7d68; }
+
+  .ek-msgs{ flex:1; padding:18px; display:flex; flex-direction:column; gap:11px;
+    overflow-y:auto; background:#f8fbf8; }
+  .msg{ max-width:82%; padding:9px 13px; font-size:14px; line-height:1.45; font-weight:600;
+    white-space:pre-wrap; word-wrap:break-word; }
+  .msg.bot{ align-self:flex-start; background:#fff; color:#244a33; border:1px solid #e6efe6;
+    border-radius:14px 14px 14px 4px; box-shadow:0 2px 6px rgba(0,0,0,.04); }
+  .msg.user{ align-self:flex-end; background:#2e8b4f; color:#fff; border-radius:14px 14px 4px 14px; }
+  .typing{ align-self:flex-start; display:none; gap:5px; background:#fff; border:1px solid #e6efe6;
+    padding:11px 14px; border-radius:14px 14px 14px 4px; }
+  .ek-msgs.thinking .typing{ display:flex; }
+  .typing span{ width:7px; height:7px; border-radius:50%; background:#9fb0a4;
+    animation:dotJump 1.1s ease-in-out infinite; }
+  .typing span:nth-child(2){ animation-delay:.18s } .typing span:nth-child(3){ animation-delay:.36s }
+
+  .ek-foot{ display:flex; gap:9px; padding:13px 14px; border-top:1px solid #eef2ee; background:#fff; }
+  .ek-foot input{ flex:1; min-width:0; border:1.5px solid #e2ece3; background:#f8fbf8; border-radius:999px;
+    padding:10px 16px; font-family:'Nunito',sans-serif; font-size:14px; font-weight:600; color:#234; outline:none; }
+  .ek-foot input:focus{ border-color:#41a85d; }
+  .ek-foot button{ flex:none; border:0; cursor:pointer; width:42px; height:42px; border-radius:50%;
+    background:#2e8b4f; color:#fff; font-size:18px; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 6px 14px -4px rgba(46,139,79,.7); } .ek-foot button:hover{ background:#22703e; }
+
+  @media (max-width:620px){
+    .ek-panel{ width:calc(100vw - 24px); height:calc(100vh - 96px); right:12px; bottom:12px; }
+    .ek-stage{ width:150px; }
+    .ek-mascot{ width:104px; }
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <h1>Demo: chat widget s maskotem Elektronem — varianta 2</h1>
+    <div class="hint">
+      <p>Klikněte na tlačítko <b>vpravo dole</b>. Maskot stojí ve vlastní zelené scéně vedle konverzace
+         a reaguje na její průběh: <b>mává</b> při otevření, <b>přemýšlí</b> (myšlenková bublina),
+         <b>mluví</b>, <b>raduje se</b> (konfety) a tváří se <b>zmateně</b>, když odpověď nezná.</p>
+      <p style="margin-bottom:0">Zkuste: <i>„Co je energetická komunita?"</i>, <i>„Jak se zapojit?"</i>,
+         <i>„Děkuju!"</i> — a něco mimo téma (<i>„Jaké bude počasí?"</i>) pro stav <b>nenašel</b>.</p>
+    </div>
+    <p style="color:#789;font-size:13px">Samostatný soubor — vše inline (fonty + animace + maskot).
+       Mock backend, žádné volání API. Produkční napojení: <code>src/mascot.ts</code> + SSE z <code>/api/chat</code>.</p>
+  </div>
+
+  <!-- ===== sbalený widget ===== -->
+  <button class="ek-launch" id="ekLaunch" aria-label="Otevřít chat s Elektronem">
+    <span class="av"><img src="__MASCOT__" alt=""></span> Zeptejte se Elektrona
+  </button>
+
+  <!-- ===== otevřený panel ===== -->
+  <div class="ek-panel" id="ekPanel" role="dialog" aria-label="Chat s Elektronem">
+    <div class="ek-stage" id="ekStage">
+      <div class="blob a"></div><div class="blob b"></div>
+      <div class="ek-pill"><div><span class="dot"></span><span id="ekStatus">Online</span></div></div>
+      <div class="ek-confetti" id="ekConfetti"></div>
+      <div class="ek-mascot">
+        <div class="ek-bubble think"><div class="box"><span></span><span></span><span></span></div><div class="tail"></div></div>
+        <div class="ek-bubble wave"><div class="box">Ahoj!<div class="nib"></div></div></div>
+        <div class="ek-bubble conf"><div class="box">?<div class="nib"></div></div></div>
+        <div class="ek-shadow"></div>
+        <div class="ek-body3d" id="ekBody3d">
+          <img src="__MASCOT__" alt="Elektron">
+          <div class="ek-eye l"></div><div class="ek-eye r"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ek-chat">
+      <div class="ek-head">
+        <div class="logo"><span>⚡</span></div>
+        <div class="meta"><b>Elektron</b><small id="ekHeadStatus">Energetická komunita Horní Pomoraví</small></div>
+        <button class="x" id="ekClose" aria-label="Zavřít">&times;</button>
+      </div>
+      <div class="ek-msgs" id="ekMsgs">
+        <div class="typing"><span></span><span></span><span></span></div>
+      </div>
+      <div class="ek-foot">
+        <input id="ekInput" placeholder="Napiš Elektronovi…" autocomplete="off">
+        <button id="ekSend" aria-label="Odeslat">&#10148;</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  var STATUS = {
+    idle:     'Online',
+    thinking: 'Přemýšlím…',
+    talking:  'Mluvím…',
+    happy:    'Jupí! 🎉',
+    wave:     'Ahoj!',
+    confused: 'Hmm…?'
+  };
+  var stage   = document.getElementById('ekStage');
+  var statusEl= document.getElementById('ekStatus');
+  var panel   = document.getElementById('ekPanel');
+  var launch  = document.getElementById('ekLaunch');
+  var msgs    = document.getElementById('ekMsgs');
+  var typing  = msgs.querySelector('.typing');
+  var input   = document.getElementById('ekInput');
+  var confettiBox = document.getElementById('ekConfetti');
+  var timers = [];
+  var greeted = false;
+
+  function clearTimers(){ timers.forEach(clearTimeout); timers = []; }
+  function setState(st){
+    stage.className = 'ek-stage s-' + st;
+    statusEl.textContent = STATUS[st] || STATUS.idle;
+    msgs.classList.toggle('thinking', st === 'thinking');
+  }
+  function addMsg(who, text){
+    var d = document.createElement('div');
+    d.className = 'msg ' + who;
+    d.textContent = text;
+    msgs.insertBefore(d, typing);
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+  function buildConfetti(){
+    if (confettiBox.childElementCount) return;
+    var colors = ['#f4c430','#ffd95e','#8fd44f','#ffffff','#c6f7cd','#5bbf57'];
+    for (var i=0;i<14;i++){
+      var s = document.createElement('div');
+      var left = Math.round(Math.random()*92)+4;
+      var size = 6 + Math.round(Math.random()*6);
+      var delay = (Math.random()*0.9).toFixed(2);
+      var dur = (1.1 + Math.random()*0.8).toFixed(2);
+      s.style.cssText = 'position:absolute;top:0;left:'+left+'%;width:'+size+'px;height:'+size+'px;'+
+        'background:'+colors[i%colors.length]+';border-radius:'+(i%2?'50%':'2px')+';'+
+        'animation:confettiFall '+dur+'s linear '+delay+'s infinite;';
+      confettiBox.appendChild(s);
+    }
+  }
+
+  // ----- mock backend -----
+  function reply(q){
+    q = q.toLowerCase();
+    var has = function(){ for (var i=0;i<arguments.length;i++) if (q.indexOf(arguments[i])>=0) return true; return false; };
+    if (has('děk','díky','super','paráda')) return { text:'Není zač! Kdykoliv se ptej dál ⚡', mood:'happy' };
+    if (has('ahoj','čau','dobrý den','zdar')) return { text:'Ahoj! Jak ti můžu pomoct s energetickou komunitou?', mood:'wave' };
+    if (has('energetick','komunit','co je')) return { text:'Energetická komunita je sdružení lidí, kteří spolu sdílejí vyrobenou elektřinu (třeba ze střešních fotovoltaik) a snižují tak náklady i závislost na síti.', mood:'talking' };
+    if (has('zapoj','připoj','vstoup','jak se')) return { text:'Zapojit se můžeš jako odběratel i jako výrobce. Stačí podat přihlášku přes obecní úřad — pomůžu ti s formulářem, když budeš chtít.', mood:'talking' };
+    if (has('cena','platit','úspor','peníz','kolik')) return { text:'Sdílením energie v komunitě obvykle ušetříš na distribučních poplatcích. Přesná částka závisí na tvé spotřebě a počtu členů.', mood:'talking' };
+    return null; // -> confused / nenašel
+  }
+
+  function send(){
+    var v = input.value.trim();
+    if (!v) return;
+    input.value = '';
+    clearTimers();
+    addMsg('user', v);
+    setState('thinking');
+    timers.push(setTimeout(function(){
+      var r = reply(v);
+      if (!r){
+        setState('confused');
+        timers.push(setTimeout(function(){
+          addMsg('bot', 'Hmm, na tohle zatím odpověď neznám. Zeptej se mě radši na energetickou komunitu ⚡');
+          timers.push(setTimeout(function(){ setState('idle'); }, 600));
+        }, 900));
+        return;
+      }
+      setState('talking');
+      timers.push(setTimeout(function(){
+        addMsg('bot', r.text);
+        if (r.mood === 'happy'){ buildConfetti(); setState('happy'); timers.push(setTimeout(function(){ setState('idle'); }, 1800)); }
+        else { setState('idle'); }
+      }, 1500));
+    }, 2200)); // ~2,2 s ať je vidět „přemýšlení"
+  }
+
+  function open(){
+    panel.classList.add('open');
+    launch.classList.add('hidden');
+    input.focus();
+    if (!greeted){
+      greeted = true;
+      addMsg('bot', 'Ahoj! Jsem Elektron, tvůj pomocník. Zeptej se mě na cokoliv ⚡');
+      setState('wave');
+      clearTimers();
+      timers.push(setTimeout(function(){ setState('idle'); }, 1600));
+    }
+  }
+  function close(){
+    panel.classList.remove('open');
+    launch.classList.remove('hidden');
+    clearTimers();
+  }
+
+  launch.addEventListener('click', open);
+  document.getElementById('ekClose').addEventListener('click', close);
+  document.getElementById('ekSend').addEventListener('click', send);
+  input.addEventListener('keydown', function(e){ if (e.key === 'Enter') send(); });
+  setState('idle');
+})();
+</script>
+</body>
+</html>
