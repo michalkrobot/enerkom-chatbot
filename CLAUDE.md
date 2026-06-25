@@ -53,7 +53,7 @@ See [`docs/01-project-structure.md`](docs/01-project-structure.md) for the full 
 - **TFM** `net10.0` · **C#** latest · **Nullable** enable · **ImplicitUsings** enable · SDK 10.0.101
 - **Build:** `.slnx` solution, `Directory.Build.props` (shared props), `Directory.Packages.props` (central package versions)
 - **Database:** PostgreSQL + **pgvector** (`vector(1536)`, HNSW index) via `Npgsql` + `Pgvector`
-- **AI:** Azure OpenAI (`gpt-4o-mini` chat, `text-embedding-3-small` embeddings) via
+- **AI:** Azure OpenAI (`gpt-4.1-mini` chat, `text-embedding-3-small` embeddings) via
   `Azure.AI.OpenAI` + `Microsoft.Extensions.AI.OpenAI` → expose as `IChatClient` /
   `IEmbeddingGenerator`. Our `EnerkomChatbot.Core/Abstractions` interfaces are thin wrappers over M.E.AI.
 - **Resilience:** `Microsoft.Extensions.Http.Resilience` — retry/backoff on 429 (TPM) and 5xx.
