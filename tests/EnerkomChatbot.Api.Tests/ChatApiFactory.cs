@@ -23,6 +23,9 @@ public sealed class ChatApiFactory : WebApplicationFactory<Program>
     {
         EmbeddingClient.EmbedQueryAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new float[1536]);
+        // Multi-query retrieval embeds the whole query list in one batch — one vector per query.
+        EmbeddingClient.EmbedBatchAsync(Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => (IReadOnlyList<float[]>)[.. ((IReadOnlyList<string>)ci[0]).Select(_ => new float[1536])]);
     }
 
     public void GivenHits(params SearchResult[] hits) =>

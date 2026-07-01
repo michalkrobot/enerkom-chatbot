@@ -103,12 +103,16 @@ public sealed partial class WebCrawler(
                 _options.SitemapUrl,
                 _options.CrawlFallbackRootUrl,
                 _options.MaxCrawlDepth,
-                new HashSet<string>(_options.ExcludeUrls, StringComparer.OrdinalIgnoreCase)));
+                new HashSet<string>(_options.ExcludeUrls, StringComparer.OrdinalIgnoreCase),
+                [],
+                []));
         }
 
         foreach (var s in _options.Sites)
         {
-            if (string.IsNullOrWhiteSpace(s.SitemapUrl) && string.IsNullOrWhiteSpace(s.CrawlFallbackRootUrl))
+            if (string.IsNullOrWhiteSpace(s.SitemapUrl)
+                && string.IsNullOrWhiteSpace(s.CrawlFallbackRootUrl)
+                && s.Urls.Length == 0)
             {
                 continue;
             }
@@ -117,17 +121,32 @@ public sealed partial class WebCrawler(
                 s.SitemapUrl,
                 s.CrawlFallbackRootUrl,
                 s.MaxCrawlDepth ?? _options.MaxCrawlDepth,
-                new HashSet<string>(s.ExcludeUrls, StringComparer.OrdinalIgnoreCase)));
+                new HashSet<string>(s.ExcludeUrls, StringComparer.OrdinalIgnoreCase),
+                s.IncludeUrlPrefixes,
+                s.Urls));
         }
 
         return sites;
     }
 
     /// <summary>Vyřešený web s aplikovanými defaulty.</summary>
-    private sealed record SiteSpec(string SitemapUrl, string? CrawlFallbackRootUrl, int MaxCrawlDepth, HashSet<string> Exclude)
+    private sealed record SiteSpec(
+        string SitemapUrl,
+        string? CrawlFallbackRootUrl,
+        int MaxCrawlDepth,
+        HashSet<string> Exclude,
+        string[] Include,
+        string[] Urls)
     {
         public string DisplayName =>
-            !string.IsNullOrWhiteSpace(CrawlFallbackRootUrl) ? CrawlFallbackRootUrl! : SitemapUrl;
+            !string.IsNullOrWhiteSpace(CrawlFallbackRootUrl) ? CrawlFallbackRootUrl!
+            : !string.IsNullOrWhiteSpace(SitemapUrl) ? SitemapUrl
+            : Urls.Length > 0 ? Urls[0] : "(prázdný web)";
+
+        /// <summary>URL se indexuje, když není v <see cref="Exclude"/> a (allow-list prázdný nebo sedí na prefix).</summary>
+        public bool Accepts(string url) =>
+            !Exclude.Contains(url)
+            && (Include.Length == 0 || Array.Exists(Include, p => url.StartsWith(p, StringComparison.OrdinalIgnoreCase)));
     }
 
     private RawSource CleanPage(string url, string html)
@@ -170,14 +189,18 @@ public sealed partial class WebCrawler(
 
     private async Task<IReadOnlyList<string>> ResolveUrlsAsync(SiteSpec site, RobotsTxt robots, CancellationToken cancellationToken)
     {
-        var exclude = site.Exclude;
+        // Explicitní seznam URL má přednost — žádná sitemap ani BFS (query string se zachová).
+        if (site.Urls.Length > 0)
+        {
+            return site.Urls.Where(site.Accepts).Distinct().ToList();
+        }
 
         if (!string.IsNullOrWhiteSpace(site.SitemapUrl))
         {
             try
             {
                 var fromSitemap = await FetchSitemapUrlsAsync(site.SitemapUrl, depth: 0, cancellationToken);
-                var filtered = fromSitemap.Where(u => !exclude.Contains(u)).Distinct().ToList();
+                var filtered = fromSitemap.Where(site.Accepts).Distinct().ToList();
                 if (filtered.Count > 0)
                 {
                     return filtered;
@@ -193,7 +216,7 @@ public sealed partial class WebCrawler(
 
         if (!string.IsNullOrWhiteSpace(site.CrawlFallbackRootUrl))
         {
-            return await CrawlBfsAsync(site, robots, exclude, cancellationToken);
+            return await CrawlBfsAsync(site, robots, cancellationToken);
         }
 
         return [];
@@ -237,7 +260,7 @@ public sealed partial class WebCrawler(
         return urls;
     }
 
-    private async Task<List<string>> CrawlBfsAsync(SiteSpec site, RobotsTxt robots, HashSet<string> exclude, CancellationToken cancellationToken)
+    private async Task<List<string>> CrawlBfsAsync(SiteSpec site, RobotsTxt robots, CancellationToken cancellationToken)
     {
         const int maxPages = 200;
         var root = new Uri(site.CrawlFallbackRootUrl!);
@@ -253,7 +276,7 @@ public sealed partial class WebCrawler(
             cancellationToken.ThrowIfCancellationRequested();
             var (url, depth) = queue.Dequeue();
 
-            if (!visited.Add(url) || exclude.Contains(url) || depth > site.MaxCrawlDepth)
+            if (!visited.Add(url) || !site.Accepts(url) || depth > site.MaxCrawlDepth)
             {
                 continue;
             }

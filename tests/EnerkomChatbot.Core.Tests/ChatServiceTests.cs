@@ -46,8 +46,8 @@ public sealed class ChatServiceTests
 
     private void SetupEmbedding() =>
         _embeddingClient
-            .EmbedQueryAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(new float[1536]);
+            .EmbedBatchAsync(Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+            .Returns(ci => (IReadOnlyList<float[]>)[.. ((IReadOnlyList<string>)ci[0]).Select(_ => new float[1536])]);
 
     [Theory]
     [InlineData("")]
@@ -130,7 +130,7 @@ public sealed class ChatServiceTests
     }
 
     [Fact]
-    public async Task PrepareAsync_HistoryLongerThanMax_TrimsToLastSixMessages()
+    public async Task PrepareAsync_HistoryLongerThanMax_TrimsToLastMaxMessages()
     {
         // Arrange
         var service = CreateService();
@@ -139,9 +139,10 @@ public sealed class ChatServiceTests
             .SearchAsync(Arg.Any<float[]>(), Arg.Any<int>(), Arg.Any<double>(), Arg.Any<CancellationToken>())
             .Returns([Hit()]);
 
-        // 10 history messages, content tagged with their index so we can identify which survived.
+        // More messages than the limit, tagged with their index so we can identify which survived.
+        var total = ChatService.MaxHistoryMessages + 4;
         var history = Enumerable
-            .Range(0, 10)
+            .Range(0, total)
             .Select(i => ChatMessage.User($"hist-{i}"))
             .ToArray();
 
@@ -150,14 +151,14 @@ public sealed class ChatServiceTests
         // Act
         var prepared = await service.PrepareAsync(query);
 
-        // Assert — messages = system + trimmed history + user question.
+        // Assert — messages = system + trimmed history + user question (posledních MaxHistoryMessages).
         var historyInMessages = prepared.Messages
             .Where(m => m.Content.StartsWith("hist-", StringComparison.Ordinal))
             .ToList();
 
         Assert.Equal(ChatService.MaxHistoryMessages, historyInMessages.Count);
-        Assert.Equal("hist-4", historyInMessages[0].Content);
-        Assert.Equal("hist-9", historyInMessages[^1].Content);
+        Assert.Equal($"hist-{total - ChatService.MaxHistoryMessages}", historyInMessages[0].Content);
+        Assert.Equal($"hist-{total - 1}", historyInMessages[^1].Content);
     }
 
     [Fact]
@@ -184,10 +185,139 @@ public sealed class ChatServiceTests
     }
 
     [Fact]
-    public async Task AnswerAsync_WithHits_CallsChatClientAndReturnsItsText()
+    public async Task PrepareAsync_MultiQuery_EmbedsAllGeneratedQueriesAndMergesHits()
+    {
+        // Arrange — model rozšíří dotaz na víc formulací (každá na řádku).
+        var service = CreateService();
+        SetupEmbedding();
+        _vectorStore
+            .SearchAsync(Arg.Any<float[]>(), Arg.Any<int>(), Arg.Any<double>(), Arg.Any<CancellationToken>())
+            .Returns([Hit()]);
+        _chatClient
+            .CompleteAsync(Arg.Any<IReadOnlyList<ChatMessage>>(), Arg.Any<CancellationToken>())
+            .Returns("kolik stojí sdílení elektřiny EDC?\ncena EDC\npoplatky za sdílení elektřiny");
+
+        var history = new[]
+        {
+            ChatMessage.User("Co je EDC?"),
+            ChatMessage.Assistant("EDC je sdílení elektřiny."),
+        };
+        var query = new ChatQuery { Question = "a kolik to stojí?", History = history };
+
+        // Act
+        var prepared = await service.PrepareAsync(query);
+
+        // Assert — embedne se dávka všech vygenerovaných dotazů; zpráva pro LLM nese původní znění.
+        await _embeddingClient.Received(1).EmbedBatchAsync(
+            Arg.Is<IReadOnlyList<string>>(q =>
+                q.Count == 3 &&
+                q.Contains("kolik stojí sdílení elektřiny EDC?") &&
+                q.Contains("cena EDC")),
+            Arg.Any<CancellationToken>());
+        Assert.Equal("a kolik to stojí?", prepared.Messages[^1].Content);
+    }
+
+    [Fact]
+    public async Task PrepareAsync_MultiQuery_CapsQueriesAtMaxQueries()
+    {
+        // Arrange — model vrátí víc řádků než MaxQueries; ořízne se.
+        var service = CreateService(new RetrievalOptions { MaxQueries = 2 });
+        SetupEmbedding();
+        _vectorStore
+            .SearchAsync(Arg.Any<float[]>(), Arg.Any<int>(), Arg.Any<double>(), Arg.Any<CancellationToken>())
+            .Returns([Hit()]);
+        _chatClient
+            .CompleteAsync(Arg.Any<IReadOnlyList<ChatMessage>>(), Arg.Any<CancellationToken>())
+            .Returns("dotaz jedna\ndotaz dva\ndotaz tři\ndotaz čtyři");
+
+        var query = new ChatQuery { Question = "cokoli" };
+
+        // Act
+        await service.PrepareAsync(query);
+
+        // Assert
+        await _embeddingClient.Received(1).EmbedBatchAsync(
+            Arg.Is<IReadOnlyList<string>>(q => q.Count == 2),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task PrepareAsync_ExpansionReturnsEmpty_FallsBackToRawQuestion()
+    {
+        // Arrange — model vrátí prázdno; retrieval musí degradovat na původní otázku, ne spadnout.
+        var service = CreateService();
+        SetupEmbedding();
+        _vectorStore
+            .SearchAsync(Arg.Any<float[]>(), Arg.Any<int>(), Arg.Any<double>(), Arg.Any<CancellationToken>())
+            .Returns([Hit()]);
+        _chatClient
+            .CompleteAsync(Arg.Any<IReadOnlyList<ChatMessage>>(), Arg.Any<CancellationToken>())
+            .Returns("   ");
+
+        var query = new ChatQuery { Question = "a co dál?" };
+
+        // Act
+        await service.PrepareAsync(query);
+
+        // Assert
+        await _embeddingClient.Received(1).EmbedBatchAsync(
+            Arg.Is<IReadOnlyList<string>>(q => q.Count == 1 && q[0] == "a co dál?"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task PrepareAsync_MultiQueryDisabled_EmbedsRawQuestionWithoutCallingChatClient()
     {
         // Arrange
-        var service = CreateService();
+        var service = CreateService(new RetrievalOptions { MultiQuery = false });
+        SetupEmbedding();
+        _vectorStore
+            .SearchAsync(Arg.Any<float[]>(), Arg.Any<int>(), Arg.Any<double>(), Arg.Any<CancellationToken>())
+            .Returns([Hit()]);
+
+        var query = new ChatQuery
+        {
+            Question = "a kolik to stojí?",
+            History = [ChatMessage.User("Co je EDC?")],
+        };
+
+        // Act
+        await service.PrepareAsync(query);
+
+        // Assert — přepínač vypnutý → žádné volání chat modelu, embedne se jen holá otázka.
+        await _chatClient.DidNotReceive().CompleteAsync(Arg.Any<IReadOnlyList<ChatMessage>>(), Arg.Any<CancellationToken>());
+        await _embeddingClient.Received(1).EmbedBatchAsync(
+            Arg.Is<IReadOnlyList<string>>(q => q.Count == 1 && q[0] == "a kolik to stojí?"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task PrepareAsync_MergesDuplicateHitsKeepingHighestSimilarity()
+    {
+        // Arrange — dvě formulace vrátí týž chunk (Id=1) s různou podobností → jeden zdroj.
+        var service = CreateService(new RetrievalOptions { MaxQueries = 2 });
+        SetupEmbedding();
+        _vectorStore
+            .SearchAsync(Arg.Any<float[]>(), Arg.Any<int>(), Arg.Any<double>(), Arg.Any<CancellationToken>())
+            .Returns([Hit(id: 1), Hit(uri: "https://b.cz", id: 2)]);
+        _chatClient
+            .CompleteAsync(Arg.Any<IReadOnlyList<ChatMessage>>(), Arg.Any<CancellationToken>())
+            .Returns("dotaz jedna\ndotaz dva");
+
+        var query = new ChatQuery { Question = "cokoli" };
+
+        // Act
+        var prepared = await service.PrepareAsync(query);
+
+        // Assert — Id 1 a 2 se objeví jen jednou, i když je vrátila obě hledání.
+        Assert.Equal(2, prepared.Sources.Count);
+    }
+
+    [Fact]
+    public async Task AnswerAsync_WithHits_CallsChatClientAndReturnsItsText()
+    {
+        // Arrange — MultiQuery vypnuté, ať se počítá jen finální volání odpovědi.
+        var service = CreateService(new RetrievalOptions { MultiQuery = false });
         SetupEmbedding();
         _vectorStore
             .SearchAsync(Arg.Any<float[]>(), Arg.Any<int>(), Arg.Any<double>(), Arg.Any<CancellationToken>())
@@ -213,8 +343,8 @@ public sealed class ChatServiceTests
     [Fact]
     public async Task AnswerAsync_NoHits_StillCallsChatClientWithoutSources()
     {
-        // Arrange
-        var service = CreateService();
+        // Arrange — MultiQuery vypnuté, ať se počítá jen finální volání odpovědi.
+        var service = CreateService(new RetrievalOptions { MultiQuery = false });
         SetupEmbedding();
         _vectorStore
             .SearchAsync(Arg.Any<float[]>(), Arg.Any<int>(), Arg.Any<double>(), Arg.Any<CancellationToken>())

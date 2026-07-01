@@ -17,7 +17,8 @@ public sealed class PromptBuilder
     public const string RateLimitMessage =
         "Omlouvám se, služba je teď dočasně vytížená. Zkuste to prosím za chvíli znovu.";
 
-    private static readonly string Template = LoadTemplate();
+    private static readonly string Template = LoadTemplate("system-prompt.cs.txt");
+    private static readonly string ExpandTemplate = LoadTemplate("expand-query.cs.txt");
     private readonly OrgOptions _org;
 
     public PromptBuilder(IOptions<OrgOptions> org) => _org = org.Value;
@@ -67,13 +68,45 @@ public sealed class PromptBuilder
             Type = h.SourceType,
         })];
 
-    private static string LoadTemplate()
+    /// <summary>
+    /// Sestaví zprávy pro rozšíření dotazu: systémový pokyn + (volitelně) přepis konverzace a poslední
+    /// dotaz. Výstupem modelu je až <paramref name="maxQueries"/> vyhledávacích dotazů, každý na řádku
+    /// (viz <c>expand-query.cs.txt</c>).
+    /// </summary>
+    public static IReadOnlyList<ChatMessage> BuildExpansionMessages(IReadOnlyList<ChatMessage> history, string question, int maxQueries)
+    {
+        var sb = new StringBuilder();
+
+        if (history.Count > 0)
+        {
+            sb.AppendLine("Historie konverzace:");
+            foreach (var m in history)
+            {
+                var speaker = m.Role == ChatRoles.Assistant ? "Asistent" : "Uživatel";
+                sb.Append(speaker).Append(": ").AppendLine(m.Content.Trim());
+            }
+
+            sb.AppendLine();
+        }
+
+        sb.Append("Poslední dotaz: ").AppendLine(question);
+        sb.AppendLine();
+        sb.Append($"Vygeneruj nejvýše {maxQueries} vyhledávacích dotazů, každý na samostatný řádek:");
+
+        return
+        [
+            ChatMessage.System(ExpandTemplate),
+            ChatMessage.User(sb.ToString()),
+        ];
+    }
+
+    private static string LoadTemplate(string suffix)
     {
         var assembly = typeof(PromptBuilder).Assembly;
         var name = Array.Find(
             assembly.GetManifestResourceNames(),
-            n => n.EndsWith("system-prompt.cs.txt", StringComparison.Ordinal))
-            ?? throw new InvalidOperationException("Embedded resource system-prompt.cs.txt nenalezen.");
+            n => n.EndsWith(suffix, StringComparison.Ordinal))
+            ?? throw new InvalidOperationException($"Embedded resource {suffix} nenalezen.");
 
         using var stream = assembly.GetManifestResourceStream(name)!;
         using var reader = new StreamReader(stream);

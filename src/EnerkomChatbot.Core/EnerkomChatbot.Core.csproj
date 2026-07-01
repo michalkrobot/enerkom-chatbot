@@ -25,6 +25,7 @@
          culture-neutral embeds it under its full namespace-qualified name, which
          PromptBuilder.LoadTemplate matches on the "system-prompt.cs.txt" suffix. -->
     <EmbeddedResource Include="Rag\Prompts\system-prompt.cs.txt" WithCulture="false" />
+    <EmbeddedResource Include="Rag\Prompts\expand-query.cs.txt" WithCulture="false" />
   </ItemGroup>
 
 </Project>
