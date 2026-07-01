@@ -67,7 +67,7 @@ function saveState(state: PersistedState): void {
 const GREETING = "Dobrý den, jsem Elektron. Zeptejte se mě na cokoli o naší organizaci ⚡";
 const NOT_FOUND =
   "To bohužel přesně nevím. Zkuste dotaz prosím přeformulovat, nebo nás kontaktujte.";
-const HISTORY_LIMIT = 6;
+const HISTORY_LIMIT = 10;
 
 const STATUS: Record<State, string> = {
   idle: "Online",
@@ -459,6 +459,9 @@ class ChatWidget {
     this.clearTimers();
     this.renderUser(question);
     this.turns.push({ kind: "user", text: question });
+    // Snapshot the prior turns BEFORE adding the current question — the server appends `question`
+    // itself, so including it in `history` would duplicate the last user turn to the model.
+    const historyToSend = this.history.slice(-HISTORY_LIMIT);
     this.history.push({ role: "user", content: question });
     this.persist();
     this.setState("thinking");
@@ -477,7 +480,7 @@ class ChatWidget {
     };
 
     try {
-      await sendChat(this.cfg.apiUrl, { question, history: this.history.slice(-HISTORY_LIMIT) }, {
+      await sendChat(this.cfg.apiUrl, { question, history: historyToSend }, {
         onToken: (text) => {
           if (firstToken) {
             firstToken = false;

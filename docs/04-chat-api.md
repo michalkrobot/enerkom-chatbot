@@ -53,8 +53,13 @@ Liveness + readiness (ověří připojení k DB). Pro monitoring/hosting.
 
 ```
 1. Validace: question 1..2000 znaků; ořež history na posledních ~6 zpráv.
-2. embedding = EmbeddingClient.EmbedQueryAsync(question)   // task type RETRIEVAL_QUERY
-3. hits = VectorStore.SearchAsync(embedding, k=5, minSimilarity=0.5)
+1b. Rozšíření dotazu (Retrieval:MultiQuery, default zap.): LLM z otázky + historie vygeneruje víc
+    formulací (přepis, synonyma, doplněný kontext, oprava překlepů) — např. „a kolik to stojí?" →
+    [„kolik stojí sdílení elektřiny EDC?", „cena EDC", „poplatky za sdílení elektřiny"]. Selhání/limit
+    degraduje na původní otázku.
+2. embeddings = EmbeddingClient.EmbedBatchAsync(searchQueries)   // task type RETRIEVAL_QUERY
+3. pro každý embedding: VectorStore.SearchAsync(k=5, minSimilarity=0.5); výsledky sloučit podle Id
+   chunku (ponechat vyšší podobnost) a vzít top-k.
 4. if hits prázdné:
       → vrať answered=false, fallback hláška (viz 05), sources=[]
 5. context = PromptBuilder.BuildContext(hits)   // očíslované úryvky + jejich zdroje
